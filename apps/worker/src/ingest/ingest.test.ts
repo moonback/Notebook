@@ -40,6 +40,7 @@ describe.skipIf(!env.SUPABASE_ANON_KEY)("ingestion + isolation (intégration)", 
 
   it("traite la source en arrière-plan et la passe en ready avec chunks indexés", async () => {
     expect((await admin.from("sources").select("status").eq("id", src).single()).data!.status).toBe("pending");
+    await admin.from("jobs").update({ priority: 0 }).eq("notebook_id", nb).eq("status", "queued"); // passer avant les jobs réels de la base de dev
     await runOnce(admin, "w-ingest", { ingest_source: ingestHandler(admin, null) });
     const s = (await admin.from("sources").select("status, language, word_count").eq("id", src).single()).data!;
     expect(s).toMatchObject({ status: "ready", language: "fr" });
@@ -68,6 +69,7 @@ describe.skipIf(!env.SUPABASE_ANON_KEY)("ingestion + isolation (intégration)", 
     const p = `${ws}/${nb}/${crypto.randomUUID()}/original.pptx`;
     expect((await admin.storage.from("sources").upload(p, new Blob([pptx], { type: "application/vnd.openxmlformats-officedocument.presentationml.presentation" }))).error).toBeNull();
     const id = (await admin.rpc("add_source", { p_notebook: nb, p_user: users[0], p_kind: "pptx", p_title: "deck.pptx", p_storage_path: p })).data as string;
+    await admin.from("jobs").update({ priority: 0 }).eq("notebook_id", nb).eq("status", "queued"); // passer avant les jobs réels de la base de dev
     await runOnce(admin, "w-ingest", { ingest_source: ingestHandler(admin, null) });
     expect((await admin.from("sources").select("status, page_count").eq("id", id).single()).data).toEqual({ status: "ready", page_count: 2 });
     const hit = (await admin.from("chunks").select("page_start, content").eq("source_id", id).ilike("content", "%patch DMX%")).data!;
@@ -76,6 +78,7 @@ describe.skipIf(!env.SUPABASE_ANON_KEY)("ingestion + isolation (intégration)", 
 
   it("indexe une note (kind note, texte dans note_body) et la rend cherchable", async () => {
     const note = (await admin.rpc("add_source", { p_notebook: nb, p_user: users[0], p_kind: "note", p_title: "Ma note", p_note_body: { text: "Le protocole sACN transporte le DMX en multicast." } })).data as string;
+    await admin.from("jobs").update({ priority: 0 }).eq("notebook_id", nb).eq("status", "queued"); // passer avant les jobs réels de la base de dev
     await runOnce(admin, "w-ingest", { ingest_source: ingestHandler(admin, null) });
     expect((await admin.from("sources").select("status").eq("id", note).single()).data!.status).toBe("ready");
     const hits = await admin.rpc("match_chunks", { p_notebook: nb, p_embedding: null, p_query: "multicast", p_fts_config: "french", p_source_ids: [note], p_k: 3 });
@@ -86,6 +89,7 @@ describe.skipIf(!env.SUPABASE_ANON_KEY)("ingestion + isolation (intégration)", 
     const a = users[0];
     const bad = (await admin.rpc("add_source", { p_notebook: nb, p_user: a, p_kind: "pdf", p_title: "faux.pdf", p_storage_path: path })).data as string;
     await admin.from("jobs").update({ max_attempts: 1 }).eq("target_id", bad);
+    await admin.from("jobs").update({ priority: 0 }).eq("notebook_id", nb).eq("status", "queued"); // passer avant les jobs réels de la base de dev
     await runOnce(admin, "w-ingest", { ingest_source: ingestHandler(admin, null) });
     const s = (await admin.from("sources").select("status, error_code").eq("id", bad).single()).data!;
     expect(s).toEqual({ status: "failed", error_code: "unreadable_file" });

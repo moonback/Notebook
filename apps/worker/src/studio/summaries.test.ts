@@ -33,6 +33,7 @@ describe.skipIf(!env.SUPABASE_URL)("guide de source et résumé du notebook (int
   afterAll(async () => { if (user) await db.auth.admin.deleteUser(user); });
 
   it("l'ingestion d'une note programme le résumé différé (pas de guide), sans quota", async () => {
+    await db.from("jobs").update({ priority: 0 }).eq("notebook_id", nb).eq("status", "queued"); // passer avant les jobs réels de la base de dev
     await runOnce(db, "w-summ", { ingest_source: ingestHandler(db, null, { summaries: true }) });
     const { data: jobs } = await db.from("jobs").select("kind, status, usage_id, run_after").eq("notebook_id", nb).in("kind", ["source_guide", "notebook_overview"]);
     expect(jobs!.map((j) => j.kind)).toEqual(["notebook_overview"]);
@@ -48,7 +49,9 @@ describe.skipIf(!env.SUPABASE_URL)("guide de source et résumé du notebook (int
     const ws = (await db.from("notebooks").select("workspace_id").eq("id", nb).single()).data!.workspace_id;
     await db.from("jobs").insert({ workspace_id: ws, notebook_id: nb, kind: "source_guide", target_id: src });
     const handlers = { source_guide: guideHandler(db, llm), notebook_overview: overviewHandler(db, llm) };
+    await db.from("jobs").update({ priority: 0 }).eq("notebook_id", nb).eq("status", "queued"); // passer avant les jobs réels de la base de dev
     await runOnce(db, "w-summ", handlers);
+    await db.from("jobs").update({ priority: 0 }).eq("notebook_id", nb).eq("status", "queued"); // passer avant les jobs réels de la base de dev
     await runOnce(db, "w-summ", handlers);
     const s = (await db.from("sources").select("guide").eq("id", src).single()).data!;
     expect(s.guide).toMatchObject({ summary: "Le DMX et Art-Net.", topics: ["DMX", "Art-Net"] });

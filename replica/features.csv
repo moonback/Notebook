@@ -68,7 +68,7 @@ Notebooks publics curés (featured),sharing,could,yes,no,Fonctionnalité clonabl
 Langue de sortie,settings,must,yes,yes,80+ langues,J01,P0,Préférence globale,S,A01,Sélecteur; appliqué au chat et au Studio,DOC
 Thème clair sombre système,settings,should,yes,yes,M0. Défaut = appareil,J02,P1,Préférence d'affichage,S,—,Bascule persistée; respect de prefers-color-scheme,DOC
 Notifications web,settings,should,yes,no,16206563,J03,P1,Notification quand un artefact est prêt,S,E02,Autorisation navigateur; notification reçue,DOC
-Envoyer un avis et signaler un notebook,settings,should,yes,no,16179536,J04,P1,Feedback avec capture + signalement d'abus,S,—,Formulaire; types d'abus; stocké et modéré,DOC
+Envoyer un avis et signaler un notebook,settings,should,yes,yes,"Avis (bug, idée) partout ; signalement d un notebook (5 motifs) ; 20/jour ; stocké en open pour modération (pas d écran de modération) — 16179536",J04,P1,Feedback avec capture + signalement d'abus,S,—,Formulaire; types d'abus; stocké et modéré,DOC
 Écran d'usage et quotas,billing,should,yes,yes,Réglages : crédits du mois + usage du jour par type (registre RLS) — Fenêtre 5 h + plafond hebdo OU quotas/jour (Q04),K01,P1,Consommation et heure de réinitialisation,M,Compteur d'usage,Jauge; message proche/atteint; reset affiché,DOC
 Generate later (file différée),billing,could,yes,no,17670842,K02,P2,Différer une génération hors quota,M,"E02, K01",Job planifié et notifié,DOC
 Plans payants et upgrade,billing,should,yes,partial,"Facturation SIMULÉE (BILLING_MODE=simulated), Stripe à brancher. Original: Plus/Pro/Ultra; prix à confirmer (Q05)",K03,P1,Abonnements avec limites différenciées,M,Stripe,Checkout; changement de plan; limites appliquées,DOC

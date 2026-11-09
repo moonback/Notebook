@@ -62,6 +62,7 @@ describe.skipIf(!env.SUPABASE_URL)("studioHandler (intégration, modèle simulé
   it("rapport généré : artefact ready, titre tiré du Markdown, citation stockée, quota confirmé", async () => {
     const llm: Llm = async () => ({ text: "## Les univers DMX\nUn univers compte 512 canaux [1].", model: "test/model", usage: null });
     const art = (await db.rpc("create_artifact", { p_notebook: nb, p_user: user, p_type: "report", p_options: { template: "briefing" }, p_custom_prompt: null, p_source_ids: [] })).data as string;
+    await db.from("jobs").update({ priority: 0 }).eq("notebook_id", nb).eq("status", "queued"); // passer avant les jobs réels de la base de dev
     await runOnce(db, "w-studio", { generate_artifact: studioHandler(db, llm) });
     const a = (await db.from("artifacts").select("status, title, content").eq("id", art).single()).data!;
     expect(a).toMatchObject({ status: "ready", title: "Les univers DMX" });
@@ -72,6 +73,7 @@ describe.skipIf(!env.SUPABASE_URL)("studioHandler (intégration, modèle simulé
 
   it("sans clé : artefact failed (ai_not_configured) et crédit rendu", async () => {
     const art = (await db.rpc("create_artifact", { p_notebook: nb, p_user: user, p_type: "quiz", p_options: {}, p_custom_prompt: null, p_source_ids: [] })).data as string;
+    await db.from("jobs").update({ priority: 0 }).eq("notebook_id", nb).eq("status", "queued"); // passer avant les jobs réels de la base de dev
     await runOnce(db, "w-studio", { generate_artifact: studioHandler(db, null) });
     expect((await db.from("artifacts").select("status, error_code").eq("id", art).single()).data).toEqual({ status: "failed", error_code: "ai_not_configured" });
     const job = (await db.from("jobs").select("usage_id").eq("target_id", art).single()).data!;
