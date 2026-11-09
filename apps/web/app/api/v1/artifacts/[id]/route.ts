@@ -17,13 +17,14 @@ export const GET = handle(async (_req: NextRequest, { params }: Params) => {
   const { id } = await params;
   await requireRole(await artifactNotebook(id), "viewer");
   const supabase = await createUserClient();
-  const [{ data: art, error }, { data: citations }] = await Promise.all([
+  const [{ data: art, error }, { data: citations }, { data: progress }] = await Promise.all([
     supabase.from("artifacts").select("id, type, title, status, error_code, options, content, custom_prompt, created_at").eq("id", id).single(),
     supabase.from("citations").select("marker, source_id, quote_text, char_start, char_end, verified").eq("artifact_id", id).order("marker"),
+    supabase.from("study_progress").select("item_key, state, answer").eq("artifact_id", id).eq("user_id", user.id),
   ]);
   if (error) throw error;
   if (art.status === "ready") await createServiceClient().from("artifact_reads").upsert({ artifact_id: id, user_id: user.id });
-  return NextResponse.json({ artifact: art, citations: citations ?? [] });
+  return NextResponse.json({ artifact: art, citations: citations ?? [], progress: progress ?? [] });
 });
 
 /** Suppression (éditeur). */

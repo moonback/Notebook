@@ -1,6 +1,14 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { Markdown } from "./studio";
+import { cardsToCsv, Markdown } from "./studio";
+
+describe("export CSV des fiches", () => {
+  it("échappe guillemets, virgules et retours à la ligne ; BOM pour Excel", () => {
+    const csv = cardsToCsv([{ key: "c0", front: 'Le "DMX", c’est ?', back: "512 canaux\npar univers" }]);
+    expect(csv.startsWith("﻿Recto,Verso\r\n")).toBe(true);
+    expect(csv).toContain('"Le ""DMX"", c’est ?","512 canaux\npar univers"');
+  });
+});
 
 const cite = { marker: 1, source_id: "s1", quote_text: "Le DMX", char_start: 0, char_end: 6, verified: true };
 const render = (text: string) => renderToStaticMarkup(<Markdown text={text} citations={[cite]} sourceTitle={() => "Guide"} />);

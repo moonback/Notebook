@@ -40,11 +40,20 @@ export function Studio({ notebookId, canEdit, sourceIds, sourceTitle, onOpenCita
   const [open, setOpen] = React.useState<string | null>(null);
   const readyCount = sourceIds.length;
 
+  const seen = React.useRef(new Map<string, string>());
   const load = React.useCallback(async () => {
     try {
       const r = await fetch(`/api/v1/notebooks/${notebookId}/artifacts`);
       if (!r.ok) throw new Error();
-      setArts((await r.json()).artifacts); setFailedLoad(false);
+      const list: Art[] = (await r.json()).artifacts;
+      // E02 : prévenir quand une génération se termine pendant que l'onglet est en arrière-plan.
+      for (const a of list) {
+        if (a.status === "ready" && busy(seen.current.get(a.id) ?? "") && document.hidden && "Notification" in window && Notification.permission === "granted") {
+          new Notification(`${label(a)} est prêt`, { body: "Ouvrez le Studio pour le consulter.", tag: a.id });
+        }
+      }
+      seen.current = new Map(list.map((a) => [a.id, a.status]));
+      setArts(list); setFailedLoad(false);
     } catch { setFailedLoad(true); }
   }, [notebookId]);
   React.useEffect(() => { void load(); }, [load]);
@@ -65,6 +74,8 @@ export function Studio({ notebookId, canEdit, sourceIds, sourceTitle, onOpenCita
     if (r.status === 503) { toast({ title: "Assistant non configuré", description: "La clé OpenRouter doit être renseignée côté serveur.", tone: "error" }); return false; }
     if (!r.ok) { toast({ title: "Génération impossible", description: j.message, tone: "error" }); return false; }
     toast({ title: `${TYPES[type].label} en préparation`, description: "Vous pouvez continuer à travailler : il apparaîtra ici une fois prêt." });
+    // demandé au moment d'un geste de l'utilisateur, une seule fois ; un refus est respecté
+    if ("Notification" in window && Notification.permission === "default") void Notification.requestPermission();
     void load();
     return true;
   }
@@ -184,8 +195,20 @@ function CreateDialog({ type, onClose, onGenerate }: { type: ArtType | null; onC
 
 type Content = { markdown?: string; cards?: Card[]; questions?: QuizQ[]; root?: MapNode };
 
+type Progress = { item_key: string; state: string; answer: number | null };
+
+/** Progression personnelle enregistrée côté serveur ; un échec n'interrompt pas la révision. */
+async function saveProgress(id: string, items: { key: string; state: string; answer?: number }[]) {
+  const r = await fetch(`/api/v1/artifacts/${id}/progress`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ items }) }).catch(() => null);
+  if (!r?.ok) toast({ title: "Progression non enregistrée", description: "Vous pouvez continuer ; elle ne sera pas conservée.", tone: "error" });
+}
+async function resetProgress(id: string) {
+  const r = await fetch(`/api/v1/artifacts/${id}/progress`, { method: "DELETE" }).catch(() => null);
+  if (!r?.ok) toast({ title: "Remise à zéro non enregistrée", tone: "error" });
+}
+
 function ArtifactViewer({ id, onClose, sourceTitle, onOpenCitation, onAsk }: { id: string | null; onClose: () => void; sourceTitle: (id: string) => string | undefined; onOpenCitation?: (c: Cite) => void; onAsk: (t: string) => void }) {
-  const [data, setData] = React.useState<{ artifact: { type: ArtType; title: string | null; content: Content }; citations: Cite[] } | null>(null);
+  const [data, setData] = React.useState<{ artifact: { id: string; type: ArtType; title: string | null; content: Content; custom_prompt: string | null }; citations: Cite[]; progress: Progress[] } | null>(null);
   const [failed, setFailed] = React.useState(false);
   React.useEffect(() => {
     if (!id) return;
@@ -197,11 +220,12 @@ function ArtifactViewer({ id, onClose, sourceTitle, onOpenCitation, onAsk }: { i
     <Dialog open={Boolean(id)} onOpenChange={(o) => !o && onClose()}>
       <DialogContent size="lg" title={art ? (art.title || TYPES[art.type].label) : "Contenu du Studio"}>
         <div className="max-h-[70dvh] overflow-y-auto pr-1">
+          {art?.custom_prompt && <p className="mb-4 rounded-md bg-surface px-3 py-2 text-xs text-text-muted"><span className="font-medium">Consignes de génération :</span> {art.custom_prompt}</p>}
           {failed ? <Alert tone="danger" title="Contenu indisponible" />
             : !art ? <div className="grid gap-2" aria-busy="true" aria-label="Chargement"><Skeleton className="h-5 w-2/3" /><Skeleton className="h-4" /><Skeleton className="h-4 w-5/6" /></div>
             : art.type === "report" ? <Markdown text={art.content.markdown ?? ""} citations={data!.citations} sourceTitle={sourceTitle} onOpen={onOpenCitation ? (c) => { onClose(); onOpenCitation(c); } : undefined} />
-            : art.type === "flashcards" ? <Flashcards cards={art.content.cards ?? []} />
-            : art.type === "quiz" ? <Quiz questions={art.content.questions ?? []} />
+            : art.type === "flashcards" ? <Flashcards id={art.id} title={art.title || "fiches"} cards={art.content.cards ?? []} progress={data!.progress} />
+            : art.type === "quiz" ? <Quiz id={art.id} questions={art.content.questions ?? []} progress={data!.progress} onExplain={onAsk} />
             : art.content.root ? <MindMap root={art.content.root} onAsk={(l) => onAsk(`Explique « ${l} » à partir de mes sources.`)} />
             : <Alert tone="danger" title="Contenu vide" />}
         </div>
@@ -243,31 +267,54 @@ export function Markdown({ text, citations, sourceTitle, onOpen }: { text: strin
 }
 
 type Card = { key: string; front: string; back: string };
-function Flashcards({ cards }: { cards: Card[] }) {
-  const [deck, setDeck] = React.useState(cards);
+/** Export CSV (recto ; verso), lisible par Excel et les applis de révision. Exporté pour les tests. */
+export function cardsToCsv(cards: Card[]) {
+  const cell = (s: string) => `"${s.replace(/"/g, '""')}"`;
+  return "﻿" + ["Recto,Verso", ...cards.map((c) => `${cell(c.front)},${cell(c.back)}`)].join("\r\n");
+}
+function downloadCsv(name: string, csv: string) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  a.download = `${name.replace(/[\\/:*?"<>|]+/g, " ").trim() || "fiches"}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function Flashcards({ id, title, cards, progress }: { id: string; title: string; cards: Card[]; progress: Progress[] }) {
+  const [acquired, setAcquired] = React.useState(() => new Set(progress.filter((p) => p.state === "got_it").map((p) => p.item_key)));
+  // Reprise : seules les fiches pas encore acquises sont reproposées.
+  const [deck, setDeck] = React.useState(() => cards.filter((c) => !acquired.has(c.key)));
+  const resumed = acquired.size > 0;
   const [i, setI] = React.useState(0);
   const [flipped, setFlipped] = React.useState(false);
   const [missed, setMissed] = React.useState<Card[]>([]);
-  const [known, setKnown] = React.useState(0);
   const mark = (ok: boolean) => {
-    if (ok) setKnown((k) => k + 1); else setMissed((m) => [...m, deck[i]]);
+    const c = deck[i];
+    void saveProgress(id, [{ key: c.key, state: ok ? "got_it" : "missed" }]);
+    if (ok) setAcquired((s) => new Set(s).add(c.key)); else setMissed((m) => [...m, c]);
     setFlipped(false); setI((x) => x + 1);
   };
-  const restart = (next: Card[]) => { setDeck(next); setI(0); setKnown(0); setMissed([]); setFlipped(false); };
-  if (!deck.length) return <Alert tone="warning" title="Aucune fiche" />;
+  const restart = (next: Card[]) => { setDeck(next); setI(0); setMissed([]); setFlipped(false); };
+  const restartAll = async () => { await resetProgress(id); setAcquired(new Set()); restart([...cards].sort(() => Math.random() - 0.5)); };
+  const exportBtn = <Button size="sm" variant="ghost" onClick={() => downloadCsv(title, cardsToCsv(cards))}>Exporter (CSV)</Button>;
+  if (!cards.length) return <Alert tone="warning" title="Aucune fiche" />;
   if (i >= deck.length) return (
     <div className="grid justify-items-center gap-4 py-6 text-center">
-      <p className="text-2xl">{known} / {deck.length} acquises</p>
+      <p className="text-2xl">{acquired.size} / {cards.length} acquises</p>
       <div className="flex flex-wrap justify-center gap-2">
         {missed.length > 0 && <Button onClick={() => restart(missed)}>{missed.length > 1 ? `Revoir les ${missed.length} fiches à retravailler` : "Revoir la fiche à retravailler"}</Button>}
-        <Button variant="secondary" onClick={() => restart([...cards].sort(() => Math.random() - 0.5))}><RotateCcw aria-hidden /> Tout reprendre (mélangé)</Button>
+        <Button variant="secondary" onClick={() => void restartAll()}><RotateCcw aria-hidden /> Tout reprendre (mélangé)</Button>
+        {exportBtn}
       </div>
     </div>
   );
   const c = deck[i];
   return (
     <div className="grid gap-4">
-      <p className="text-sm text-text-muted">Fiche {i + 1} / {deck.length}</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm text-text-muted">Fiche {i + 1} / {deck.length}{resumed && i === 0 ? ` · reprise, ${acquired.size} déjà acquise${acquired.size > 1 ? "s" : ""}` : ""}</p>
+        {exportBtn}
+      </div>
       <button onClick={() => setFlipped((f) => !f)} aria-label={flipped ? "Réponse — cliquer pour revoir la question" : "Question — cliquer pour voir la réponse"}
         className={cn("grid min-h-48 place-items-center rounded-xl border p-6 text-center font-serif text-xl transition-colors", flipped ? "bg-accent-soft text-on-accent-soft" : "bg-surface")}>
         <span aria-live="polite">{flipped ? c.back : c.front}</span>
@@ -281,16 +328,21 @@ function Flashcards({ cards }: { cards: Card[] }) {
 }
 
 type QuizQ = { key: string; question: string; choices: string[]; answer: number; hint?: string; explanation?: string };
-function Quiz({ questions }: { questions: QuizQ[] }) {
-  const [i, setI] = React.useState(0);
+function Quiz({ id, questions, progress, onExplain }: { id: string; questions: QuizQ[]; progress: Progress[]; onExplain: (text: string) => void }) {
+  const answered0 = new Map(progress.map((p) => [p.item_key, p]));
+  // Reprise à la première question sans réponse ; le score tient compte des réponses déjà données.
+  const start = questions.findIndex((q) => !answered0.has(q.key));
+  const [i, setI] = React.useState(start < 0 ? questions.length : start);
+  const resumed = answered0.size > 0 && start > 0;
   const [picked, setPicked] = React.useState<number | null>(null);
-  const [score, setScore] = React.useState(0);
+  const [score, setScore] = React.useState(() => progress.filter((p) => p.state === "correct").length);
   const [hint, setHint] = React.useState(false);
+  const restart = async () => { await resetProgress(id); setI(0); setScore(0); setPicked(null); setHint(false); };
   if (!questions.length) return <Alert tone="warning" title="Aucune question" />;
   if (i >= questions.length) return (
     <div className="grid justify-items-center gap-4 py-6 text-center">
       <p className="text-2xl">Score : {score} / {questions.length}</p>
-      <Button variant="secondary" onClick={() => { setI(0); setScore(0); setPicked(null); setHint(false); }}><RotateCcw aria-hidden /> Recommencer</Button>
+      <Button variant="secondary" onClick={() => void restart()}><RotateCcw aria-hidden /> Recommencer</Button>
     </div>
   );
   const q = questions[i];
@@ -298,12 +350,12 @@ function Quiz({ questions }: { questions: QuizQ[] }) {
   const letter = (k: number) => String.fromCharCode(65 + k);
   return (
     <div className="grid gap-4">
-      <p className="text-sm text-text-muted">Question {i + 1} / {questions.length} · score {score}</p>
+      <p className="text-sm text-text-muted">Question {i + 1} / {questions.length} · score {score}{resumed && i === start ? " · reprise là où vous vous étiez arrêté" : ""}</p>
       <p className="font-serif text-reading">{q.question}</p>
       <div role="radiogroup" aria-label="Choix de réponse" className="grid gap-2">
         {q.choices.map((ch, k) => (
           <button key={k} role="radio" aria-checked={picked === k} disabled={answered}
-            onClick={() => { setPicked(k); if (k === q.answer) setScore((s) => s + 1); }}
+            onClick={() => { setPicked(k); if (k === q.answer) setScore((s) => s + 1); void saveProgress(id, [{ key: q.key, state: k === q.answer ? "correct" : "wrong", answer: k }]); }}
             className={cn("rounded-lg border p-3 text-left text-sm transition-colors enabled:hover:bg-surface",
               answered && (k === q.answer ? "border-success bg-success-soft" : k === picked ? "border-danger bg-danger-soft" : "opacity-60"))}>
             <span className="mr-2 font-mono text-text-subtle">{letter(k)}.</span>{ch}
@@ -317,6 +369,7 @@ function Quiz({ questions }: { questions: QuizQ[] }) {
       {answered && (
         <Alert tone={picked === q.answer ? "success" : "warning"} title={picked === q.answer ? "Bonne réponse" : `Réponse attendue : ${letter(q.answer)}`}>{q.explanation}</Alert>
       )}
+      {answered && <Button variant="ghost" size="sm" className="justify-self-start" onClick={() => onExplain(`Explique la question « ${q.question} » : pourquoi la bonne réponse est « ${q.choices[q.answer]} » ?`)}>Expliquer dans le chat</Button>}
       {answered && <Button className="justify-self-end" onClick={() => { setI((x) => x + 1); setPicked(null); setHint(false); }}>{i + 1 < questions.length ? "Question suivante" : "Voir le score"}</Button>}
     </div>
   );
