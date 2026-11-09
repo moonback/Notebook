@@ -57,7 +57,7 @@ Date : 2026-11-09.
 
 ## M2 : Indispensables (2 semaines) → parité *must* = 22/22
 
-> **État au 2026-11-09 : 22/22 indispensables faits** (M1 + M2), avec en plus le chat via OpenRouter, la facturation simulée et les écrans S03, S08, S10, S11, S24, S28. Testé avec un faux OpenRouter local ; la vraie clé reste à fournir. M3 : Studio texte (rapport, fiches, quiz, carte mentale) et quotas visibles faits le 2026-11-09 ; reste Stripe réel (clés de l'utilisateur) pour clore le MVP vendable.
+> **État au 2026-11-09 : 22/22 indispensables faits** (M1 + M2), avec en plus le chat via OpenRouter, la facturation simulée et les écrans S03, S08, S10, S11, S24, S28. Testé avec un faux OpenRouter local ; la vraie clé reste à fournir. M3 : Studio texte (rapport, fiches, quiz, carte mentale) et quotas visibles faits le 2026-11-09 ; reste Stripe réel (clés de l'utilisateur) pour clore le MVP vendable. M4 commencé : H01 partage privé fait.
 
 | | |
 | --- | --- |

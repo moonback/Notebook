@@ -69,7 +69,7 @@ set local role service_role;
 select lives_ok($$ select public.create_artifact('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-00000000000a', 'audio', '{}', null, '{}') $$, 'audio 1/2');
 select lives_ok($$ select public.create_artifact('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-00000000000a', 'audio', '{}', null, '{}') $$, 'audio 2/2');
 select throws_ok($$ select public.create_artifact('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-00000000000a', 'audio', '{}', null, '{}') $$, 'P0001', 'quota_daily_exceeded', 'audio 3 refusé');
-select is((select count(*)::int from public.artifacts), 2, 'pas d''artefact orphelin');
+select is((select count(*)::int from public.artifacts where notebook_id = '11111111-1111-1111-1111-111111111111'), 2, 'pas d''artefact orphelin');
 reset role;
 
 -- invariant : RLS active partout

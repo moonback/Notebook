@@ -11,6 +11,7 @@ import { Citation } from "@/components/ui/citation";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { Studio } from "./studio";
+import { ShareButton } from "./share-dialog";
 
 export type Role = "chat" | "viewer" | "editor" | "owner";
 type Source = { id: string; kind: string; title: string; status: string; error_code: string | null; word_count: number | null };
@@ -203,6 +204,7 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
             onBlur={(e) => void rename(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
             className="min-w-0 flex-1 truncate rounded-md bg-transparent px-2 py-1 text-lg font-semibold hover:bg-surface focus-visible:bg-surface" />
         ) : <h1 className="truncate text-lg font-semibold">{title || "Notebook sans titre"}</h1>}
+        {role === "owner" && <ShareButton notebookId={notebookId} />}
       </div>
 
       {/* ≥ lg : 3 panneaux ; < lg : un onglet à la fois. Une SEULE disposition montée (un seul chat). */}
