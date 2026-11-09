@@ -3,6 +3,7 @@ import { PermanentError, type Handler } from "../worker.ts";
 import type { Embedder } from "../ai/embeddings.ts";
 import { chunk, normalize } from "./chunker.ts";
 import { extract } from "./extract.ts";
+import { enqueueSummaries } from "../studio/summaries.ts";
 
 const FTS_CONFIG: Record<string, string> = { fr: "french", en: "english", es: "spanish", de: "german", it: "italian", pt: "portuguese", nl: "dutch" };
 
@@ -19,7 +20,8 @@ export function detectLanguage(text: string): string {
  * Job ingest_source : télécharge l'original depuis Storage (ou l'URL), extrait, découpe, embedde,
  * puis remplace les chunks en UNE transaction (replace_chunks). Statuts persistants à chaque étape.
  */
-export function ingestHandler(db: SupabaseClient, embedder: Embedder | null): Handler {
+/** summaries : programme guide de source + résumé du notebook (seulement si un modèle est configuré). */
+export function ingestHandler(db: SupabaseClient, embedder: Embedder | null, opts: { summaries?: boolean } = {}): Handler {
   return async (job, ctx) => {
     const { data: src, error } = await db.from("sources").select("id, kind, storage_path, origin_url, notebook_id, workspace_id, note_body")
       .eq("id", job.target_id!).single();
@@ -55,6 +57,8 @@ export function ingestHandler(db: SupabaseClient, embedder: Embedder | null): Ha
       });
       if (e2) throw e2;
       if (ex.title && src.kind === "web") await db.from("sources").update({ title: ex.title.slice(0, 300) }).eq("id", src.id);
+      // une note s'ouvre dans son éditeur : pas de guide, mais elle compte dans le résumé du notebook
+      if (opts.summaries) await enqueueSummaries(db, { workspace_id: src.workspace_id, notebook_id: src.notebook_id, source_id: src.kind === "note" ? undefined : src.id });
       return { chunks: chunks.length, embedded: Boolean(vectors), language: lang };
     } catch (e) {
       // statut persistant lisible par l'interface ; la décision de réessayer reste au worker

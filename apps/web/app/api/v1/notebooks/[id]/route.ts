@@ -6,14 +6,17 @@ import { createServiceClient, createUserClient } from "@/lib/supabase/server";
 
 type Params = { params: Promise<{ id: string }> };
 
-/** En-tête du notebook + rôle courant. */
+/** En-tête du notebook, réglages du chat, résumé et questions suggérées (C03), rôle courant. */
 export const GET = handle(async (_req: NextRequest, { params }: Params) => {
   await requireUser();
   const { id } = await params;
   const role = await requireRole(id, "chat");
   const supabase = await createUserClient();
-  const { data } = await supabase.from("notebooks").select("id, title, emoji, created_at, last_activity_at, chat_style, chat_custom_prompt, response_length").eq("id", id).single();
-  return NextResponse.json({ notebook: data, role });
+  const [{ data }, { count: pending }] = await Promise.all([
+    supabase.from("notebooks").select("id, title, emoji, created_at, last_activity_at, chat_style, chat_custom_prompt, response_length, overview, suggested_questions").eq("id", id).single(),
+    createServiceClient().from("jobs").select("id", { count: "exact", head: true }).eq("notebook_id", id).eq("kind", "notebook_overview").in("status", ["queued", "running"]),
+  ]);
+  return NextResponse.json({ notebook: data, role, overviewPending: Boolean(pending) });
 });
 
 const patchSchema = z.object({

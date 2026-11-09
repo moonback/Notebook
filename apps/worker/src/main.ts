@@ -5,6 +5,7 @@ import { embedderFromEnv } from "./ai/embeddings.ts";
 import { ingestHandler } from "./ingest/handler.ts";
 import { llmFromEnv } from "./ai/llm.ts";
 import { studioHandler } from "./studio/generate.ts";
+import { guideHandler, overviewHandler } from "./studio/summaries.ts";
 
 const url = process.env.SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -19,11 +20,13 @@ const embedder = embedderFromEnv();
 if (!embedder) console.warn("EMBEDDINGS_* non configuré : indexation en plein texte uniquement (pas de recherche vectorielle).");
 
 // Un handler par type de job réellement implémenté ; les autres types ne sont pas réclamés.
+const llm = llmFromEnv();
 const handlers: Partial<Record<JobKind, Handler>> = {
-  ingest_source: ingestHandler(db, embedder),
-  generate_artifact: studioHandler(db, llmFromEnv()),
+  ingest_source: ingestHandler(db, embedder, { summaries: Boolean(llm) }),
+  generate_artifact: studioHandler(db, llm),
+  ...(llm ? { source_guide: guideHandler(db, llm), notebook_overview: overviewHandler(db, llm) } : {}),
 };
-if (!llmFromEnv()) console.warn("OPENROUTER_API_KEY / OPENROUTER_CHAT_MODEL absents : les générations du Studio échoueront (crédit rendu).");
+if (!llm) console.warn("OPENROUTER_API_KEY / OPENROUTER_CHAT_MODEL absents : Studio en échec (crédit rendu), pas de guides ni de résumé de notebook.");
 
 let stopping = false;
 process.on("SIGTERM", () => (stopping = true));

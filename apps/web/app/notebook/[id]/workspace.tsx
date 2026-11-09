@@ -15,6 +15,7 @@ import { Studio } from "./studio";
 export type Role = "chat" | "viewer" | "editor" | "owner";
 type Source = { id: string; kind: string; title: string; status: string; error_code: string | null; word_count: number | null };
 type Cite = { marker: number; source_id: string; quote_text: string; char_start: number; char_end: number; verified: boolean };
+type Overview = { text: string | null; questions: string[]; pending: boolean };
 type Message = { id: string; role: "user" | "assistant"; content: string; status: string; citations?: Cite[]; feedback?: number | null };
 
 const ERRORS: Record<string, string> = {
@@ -57,6 +58,17 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
   const [mobileTab, setMobileTab] = React.useState("chat");
   const [draft, setDraft] = React.useState<{ text: string } | null>(null); // question pré-remplie depuis le Studio
   const desktop = useMediaQuery("(min-width: 1024px)");
+  const [overview, setOverview] = React.useState<Overview | null>(null);
+  const loadOverview = React.useCallback(async () => {
+    try {
+      const r = await fetch(`/api/v1/notebooks/${notebookId}`);
+      if (!r.ok) return;
+      const j = await r.json();
+      setOverview({ text: j.notebook.overview, questions: j.notebook.suggested_questions ?? [], pending: j.overviewPending });
+    } catch { /* le résumé est facultatif : le chat reste utilisable */ }
+  }, [notebookId]);
+  React.useEffect(() => { void loadOverview(); }, [loadOverview]);
+  const ask = (text: string) => { setViewer(null); setDraft({ text }); setMobileTab("chat"); };
 
   const load = React.useCallback(async () => {
     if (role === "chat") return setSources([]);
@@ -78,6 +90,17 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
     const t = setInterval(() => void load(), 2500);
     return () => clearInterval(t);
   }, [processing, load]);
+  // Le résumé est programmé juste après l'ingestion (puis différé) : on le suit tant qu'il est attendu.
+  React.useEffect(() => {
+    if (processing) return;
+    const once = setTimeout(() => void loadOverview(), 2000);
+    return () => clearTimeout(once);
+  }, [processing, loadOverview]);
+  React.useEffect(() => {
+    if (!overview?.pending) return;
+    const t = setInterval(() => void loadOverview(), 5000);
+    return () => clearInterval(t);
+  }, [overview?.pending, loadOverview]);
 
   async function saveSelection(next: Set<string>) {
     setDeselected(next);
@@ -103,7 +126,7 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
   async function removeSource(s: Source) {
     if (!confirm(`Supprimer la source « ${s.title} » ? Les réponses passées gardent leurs extraits cités.`)) return;
     const res = await fetch(`/api/v1/sources/${s.id}`, { method: "DELETE" });
-    if (res.ok) { setSources((xs) => xs?.filter((x) => x.id !== s.id) ?? null); toast({ title: "Source supprimée", tone: "success" }); }
+    if (res.ok) { setSources((xs) => xs?.filter((x) => x.id !== s.id) ?? null); toast({ title: "Source supprimée", tone: "success" }); void loadOverview(); }
     else toast({ title: "Suppression impossible", tone: "error" });
   }
 
@@ -164,12 +187,12 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
   );
 
   const titles = new Map((sources ?? []).map((s) => [s.id, s.title]));
-  const chatPanel = <Chat notebookId={notebookId} readyCount={selectedCount} sourceTitle={(id) => titles.get(id)} canSaveNote={canEdit} onNoteSaved={() => void load()} onOpenCitation={(c) => setViewer({ sourceId: c.source_id, range: [c.char_start, c.char_end] })} canViewSources={role !== "chat"} draft={draft} canConfigure={canEdit} />;
+  const chatPanel = <Chat notebookId={notebookId} readyCount={selectedCount} sourceTitle={(id) => titles.get(id)} canSaveNote={canEdit} onNoteSaved={() => void load()} onOpenCitation={(c) => setViewer({ sourceId: c.source_id, range: [c.char_start, c.char_end] })} canViewSources={role !== "chat"} draft={draft} canConfigure={canEdit} overview={overview} />;
 
   const studioPanel = (
     <Studio notebookId={notebookId} canEdit={canEdit} sourceIds={ready.filter((s) => !deselected.has(s.id)).map((s) => s.id)} sourceTitle={(id) => titles.get(id)}
       onOpenCitation={role !== "chat" ? (c) => setViewer({ sourceId: c.source_id, range: [c.char_start, c.char_end] }) : undefined}
-      onAsk={(text) => { setDraft({ text }); setMobileTab("chat"); }} />
+      onAsk={ask} />
   );
 
   return (
@@ -201,7 +224,7 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
       )}
 
       <AddSourcesDialog open={adding} onOpenChange={setAdding} notebookId={notebookId} onAdded={() => void load()} />
-      <SourceViewer state={viewer} onClose={() => setViewer(null)} />
+      <SourceViewer state={viewer} onClose={() => setViewer(null)} onAsk={ask} />
       <RenameSourceDialog source={renaming} onClose={() => setRenaming(null)} onRename={renameSource} />
       <NoteEditor state={noteEditor} notebookId={notebookId} canEdit={canEdit} onClose={() => setNoteEditor(null)} onSaved={() => void load()} />
     </>
@@ -210,7 +233,7 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
 
 /* ---------------------------------------------------------------- Chat ---- */
 
-function Chat({ notebookId, readyCount, onOpenCitation, canViewSources, sourceTitle, canSaveNote, onNoteSaved, draft, canConfigure }: { notebookId: string; readyCount: number; onOpenCitation: (c: Cite) => void; canViewSources: boolean; sourceTitle: (id: string) => string | undefined; canSaveNote: boolean; onNoteSaved: () => void; draft: { text: string } | null; canConfigure: boolean }) {
+function Chat({ notebookId, readyCount, onOpenCitation, canViewSources, sourceTitle, canSaveNote, onNoteSaved, draft, canConfigure, overview }: { notebookId: string; readyCount: number; onOpenCitation: (c: Cite) => void; canViewSources: boolean; sourceTitle: (id: string) => string | undefined; canSaveNote: boolean; onNoteSaved: () => void; draft: { text: string } | null; canConfigure: boolean; overview: Overview | null }) {
   const [saved, setSaved] = React.useState<Set<string>>(new Set());
   async function saveNote(id: string) {
     const res = await fetch(`/api/v1/messages/${id}/save-note`, { method: "POST" });
@@ -250,9 +273,9 @@ function Chat({ notebookId, readyCount, onOpenCitation, canViewSources, sourceTi
   }, [notebookId]);
   React.useEffect(() => { bottom.current?.scrollIntoView({ block: "end" }); }, [messages]);
 
-  async function send(e?: React.FormEvent) {
+  async function send(e?: React.FormEvent, preset?: string) {
     e?.preventDefault();
-    const q = text.trim();
+    const q = (preset ?? text).trim();
     if (!q || streaming || !conversationId) return;
     setText(""); setError(null); setStreaming(true);
     const tmp: Message = { id: "pending", role: "assistant", content: "", status: "streaming" };
@@ -308,9 +331,26 @@ function Chat({ notebookId, readyCount, onOpenCitation, canViewSources, sourceTi
           {messages === null ? (
             <div className="grid gap-2" aria-busy="true" aria-label="Chargement"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-4 w-1/2" /></div>
           ) : messages.length === 0 ? (
-            <EmptyState icon={<Sparkles />} title={readyCount ? "Posez votre première question" : "Ajoutez une source pour commencer"}>
-              {readyCount ? "Les réponses s’appuient uniquement sur vos sources sélectionnées et citent leurs passages." : "Dès qu’une source est prête, vous pourrez l’interroger ici."}
-            </EmptyState>
+            overview?.text && readyCount ? (
+              <div className="grid gap-4">
+                <h2 className="text-sm font-medium text-text-muted">Résumé de vos sources</h2>
+                <p className="font-serif text-reading">{overview.text}</p>
+                {overview.questions.length > 0 && (
+                  <div className="grid gap-2">
+                    <p className="text-sm text-text-muted">Pour commencer :</p>
+                    {overview.questions.map((q) => (
+                      <Button key={q} variant="secondary" className="h-auto justify-start whitespace-normal py-2 text-left" disabled={streaming || !conversationId} onClick={() => void send(undefined, q)}>{q}</Button>
+                    ))}
+                  </div>
+                )}
+                {overview.pending && <p className="text-xs text-text-subtle">Mise à jour du résumé en cours…</p>}
+              </div>
+            ) : (
+              <EmptyState icon={<Sparkles />} title={readyCount ? "Posez votre première question" : "Ajoutez une source pour commencer"}>
+                {readyCount ? "Les réponses s’appuient uniquement sur vos sources sélectionnées et citent leurs passages." : "Dès qu’une source est prête, vous pourrez l’interroger ici."}
+                {readyCount > 0 && overview?.pending && <span className="mt-2 block text-xs text-text-subtle">Résumé de vos sources en préparation…</span>}
+              </EmptyState>
+            )
           ) : messages.map((m) => m.role === "user" ? (
             <div key={m.id} className="max-w-[85%] justify-self-end whitespace-pre-wrap rounded-xl rounded-br-xs bg-surface px-4 py-2.5 text-sm">{m.content}</div>
           ) : (
@@ -556,8 +596,8 @@ function AddSourcesDialog({ open, onOpenChange, notebookId, onAdded }: { open: b
 
 /* --------------------------------------------------------- Visionneuse ---- */
 
-function SourceViewer({ state, onClose }: { state: { sourceId: string; range?: [number, number] } | null; onClose: () => void }) {
-  const [source, setSource] = React.useState<{ title: string; extracted_text: string | null } | null>(null);
+function SourceViewer({ state, onClose, onAsk }: { state: { sourceId: string; range?: [number, number] } | null; onClose: () => void; onAsk: (text: string) => void }) {
+  const [source, setSource] = React.useState<{ title: string; extracted_text: string | null; guide: { summary: string; topics: string[] } | null } | null>(null);
   const [failed, setFailed] = React.useState(false);
   const mark = React.useRef<HTMLElement>(null);
   React.useEffect(() => {
@@ -576,9 +616,24 @@ function SourceViewer({ state, onClose }: { state: { sourceId: string; range?: [
           {failed ? <Alert tone="danger" title="Source indisponible" /> : !source ? (
             <div className="grid gap-2" aria-busy="true"><Skeleton className="h-4" /><Skeleton className="h-4 w-5/6" /><Skeleton className="h-4 w-4/6" /></div>
           ) : (
+            <>
+            {source.guide && (
+              <section aria-label="Guide de la source" className="mb-5 grid gap-3 rounded-lg border bg-surface-raised p-4">
+                <h3 className="text-sm font-medium text-text-muted">Guide de la source</h3>
+                <p className="text-sm leading-6">{source.guide.summary}</p>
+                {source.guide.topics.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {source.guide.topics.map((t) => (
+                      <Button key={t} size="sm" variant="secondary" title="Poser une question sur ce thème" onClick={() => onAsk(`Que disent mes sources sur « ${t} » ?`)}>{t}</Button>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
             <p className={cn("whitespace-pre-wrap font-serif text-reading")}>
               {state?.range ? <>{text.slice(0, a)}<mark ref={mark} className="rounded-xs bg-highlight px-0.5 text-on-highlight">{text.slice(a, b)}</mark>{text.slice(b)}</> : text}
             </p>
+            </>
           )}
         </div>
       </DialogContent>
