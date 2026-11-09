@@ -39,8 +39,10 @@ function fromHtml(html: string): Extracted {
 }
 
 /** Texte brut d'une source, selon son type. Les erreurs attendues sont des PermanentError (code stable). */
-export async function extract(kind: string, data: { file?: Uint8Array; url?: string }): Promise<Extracted> {
+export async function extract(kind: string, data: { file?: Uint8Array; url?: string; noteText?: string }): Promise<Extracted> {
   switch (kind) {
+    case "note":
+      return finalize({ text: data.noteText ?? "", pageStarts: [], pageCount: null });
     case "txt": case "md": case "csv": case "text":
       return finalize({ text: new TextDecoder("utf-8").decode(data.file), pageStarts: [], pageCount: null });
     case "pdf":

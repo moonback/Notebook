@@ -50,6 +50,18 @@ export const sourceItemSchema = z.discriminatedUnion("type", [
 ]);
 export const sourcesCreateSchema = z.object({ items: z.array(sourceItemSchema).min(1).max(50) }).strict();
 
+export const NOTE_MAX_CHARS = 200_000;
+export const noteCreateSchema = z.object({
+  title: z.string().trim().min(1, "Titre requis.").max(300, "300 caractères maximum."),
+  text: z.string().trim().min(1, "La note est vide.").max(NOTE_MAX_CHARS, "Note trop longue (200 000 caractères maximum)."),
+}).strict();
+export const notePatchSchema = z.object({
+  title: z.string().trim().min(1, "Titre requis.").max(300, "300 caractères maximum."),
+  text: z.string().trim().min(1, "La note est vide.").max(NOTE_MAX_CHARS, "Note trop longue (200 000 caractères maximum)."),
+  /** Retire les citations d'une note issue du chat pour pouvoir la modifier. */
+  unlock: z.literal(true),
+}).partial().strict().refine((v) => Object.keys(v).length > 0, "Aucune modification.");
+
 /** Extension d'un nom de fichier → type d'upload accepté, ou null. */
 export function uploadTypeOf(filename: string) {
   const ext = filename.toLowerCase().split(".").pop() ?? "";

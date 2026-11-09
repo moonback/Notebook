@@ -36,9 +36,9 @@ Questions multilingues et langue de sortie,chat,must,yes,yes,"Langue du notebook
 Fonctions agentiques du chat (fichiers graphiques code),chat,could,yes,no,"Expérimental: png svg pdf docx xlsx pptx csv json",C11,P3,"Génération de fichiers et exécution de code depuis le chat",XL,"Sandbox d'exécution","Demande de graphique -> fichier téléchargeable",DOC
 Chat vocal live,chat,could,yes,skip,"Mobile 18+ uniquement dans l'original",C12,P3,"Conversation vocale interruptible",XL,"STT/TTS temps réel","—",INA
 Apps connectées dans le chat,chat,could,yes,no,"18784282; activables par notebook",C13,P3,"Outils tiers appelés par le chat",L,"Intégrations OAuth","App connectée utilisable et désactivable par notebook",DOC
-Créer une note manuelle,notes,must,yes,no,"16262519",D01,P0,"Éditeur de note dans le panneau Sources",M,B01,"Créer, éditer, sauvegarder, supprimer une note",DOC
-Sauvegarder une réponse en note,notes,must,yes,no,"Format et citations conservés",D02,P0,"Épingler une réponse du chat",S,"C02, D01","Clic -> note créée avec citations cliquables",DOC
-Notes utilisées comme sources,notes,must,yes,no,"Cochables; citées; incluses au Studio",D03,P0,"Les notes alimentent le RAG",M,"D01, C01","Note cochée -> citée dans les réponses; décochée -> ignorée",DOC
+Créer une note manuelle,notes,must,yes,yes,"16262519",D01,P0,"Éditeur de note dans le panneau Sources",M,B01,"Créer, éditer, sauvegarder, supprimer une note",DOC
+Sauvegarder une réponse en note,notes,must,yes,yes,"Format et citations conservés",D02,P0,"Épingler une réponse du chat",S,"C02, D01","Clic -> note créée avec citations cliquables",DOC
+Notes utilisées comme sources,notes,must,yes,yes,"Cochables; citées; incluses au Studio",D03,P0,"Les notes alimentent le RAG",M,"D01, C01","Note cochée -> citée dans les réponses; décochée -> ignorée",DOC
 Exporter une note,notes,could,yes,no,"Original: vers Google Docs",D04,P2,"Export de note",S,D01,"Export Markdown/DOCX (Docs en option)",DOC
 Corbeille et historique de versions des notes,notes,could,no,no,"Différenciation: l'original ne permet pas de récupérer une note supprimée",D05,P2,"Restaurer une note supprimée",S,D01,"Note supprimée récupérable 30 jours",N/A (différenciation)
 Panneau Studio et liste d'artefacts,studio,should,yes,no,"16206563",E01,P1,"Hub de génération + liste des sorties",M,"C01, file de jobs","Tuiles par type; artefacts listés; renommer/supprimer/télécharger",DOC

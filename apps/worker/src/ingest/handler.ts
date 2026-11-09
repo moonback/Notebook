@@ -21,7 +21,7 @@ export function detectLanguage(text: string): string {
  */
 export function ingestHandler(db: SupabaseClient, embedder: Embedder | null): Handler {
   return async (job, ctx) => {
-    const { data: src, error } = await db.from("sources").select("id, kind, storage_path, origin_url, notebook_id, workspace_id")
+    const { data: src, error } = await db.from("sources").select("id, kind, storage_path, origin_url, notebook_id, workspace_id, note_body")
       .eq("id", job.target_id!).single();
     if (error || !src) throw new PermanentError("source_not_found");
     // le job et la source doivent appartenir au même tenant (défense en profondeur)
@@ -37,7 +37,7 @@ export function ingestHandler(db: SupabaseClient, embedder: Embedder | null): Ha
         file = new Uint8Array(await blob.arrayBuffer());
       }
       await ctx.progress(25, "extraction");
-      const ex = await extract(src.kind, { file, url: src.origin_url ?? undefined });
+      const ex = await extract(src.kind, { file, url: src.origin_url ?? undefined, noteText: (src.note_body as { text?: string } | null)?.text });
       const text = normalize(ex.text);
       const lang = detectLanguage(text);
       const chunks = chunk(text, { pageStarts: ex.pageStarts });

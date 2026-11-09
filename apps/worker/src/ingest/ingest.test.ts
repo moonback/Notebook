@@ -60,6 +60,14 @@ describe.skipIf(!env.SUPABASE_ANON_KEY)("ingestion + isolation (intégration)", 
     expect(signed.data).toBeNull();
   });
 
+  it("indexe une note (kind note, texte dans note_body) et la rend cherchable", async () => {
+    const note = (await admin.rpc("add_source", { p_notebook: nb, p_user: users[0], p_kind: "note", p_title: "Ma note", p_note_body: { text: "Le protocole sACN transporte le DMX en multicast." } })).data as string;
+    await runOnce(admin, "w-ingest", { ingest_source: ingestHandler(admin, null) });
+    expect((await admin.from("sources").select("status").eq("id", note).single()).data!.status).toBe("ready");
+    const hits = await admin.rpc("match_chunks", { p_notebook: nb, p_embedding: null, p_query: "multicast", p_fts_config: "french", p_source_ids: [note], p_k: 3 });
+    expect((hits.data as unknown[]).length).toBe(1);
+  });
+
   it("une erreur d'extraction donne un statut failed persistant et lisible", async () => {
     const a = users[0];
     const bad = (await admin.rpc("add_source", { p_notebook: nb, p_user: a, p_kind: "pdf", p_title: "faux.pdf", p_storage_path: path })).data as string;

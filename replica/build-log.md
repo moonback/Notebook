@@ -10,3 +10,4 @@
 | 2026-11-09 | S08 espace notebook + S05 ajout de sources + S10 visionneuse | fait | Renommer une source, labels, Studio (affiché « bientôt ») | Deux dispositions montées en même temps → deux chats ; une seule montée désormais |
 | 2026-11-09 | S11 chat en flux + citations cliquables | fait (testé avec un faux OpenRouter) | Vraie clé OpenRouter ; Markdown riche | Effets React qui renvoyaient une valeur (`destroy is not a function`) |
 | 2026-11-09 | S28 réglages (préférences + offre simulée) | fait | Stripe réel | — |
+| 2026-11-09 | S24 notes (créer, modifier, verrou des citations, enregistrer une réponse) | fait | Éditeur riche (Tiptap prévu) : texte simple pour l instant ; export | Rechargement à chaud pendant le test (état UI perdu, serveur correct) |

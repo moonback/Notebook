@@ -1,6 +1,6 @@
 "use client";
 import * as React from "react";
-import { AlertTriangle, ArrowUp, FileText, Globe, Inbox, Plus, Square, Sparkles, Trash2, Type, Upload } from "lucide-react";
+import { AlertTriangle, ArrowUp, BookmarkPlus, FileText, Globe, Inbox, Lock, NotebookPen, Plus, Square, Sparkles, Trash2, Type, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { Alert, Badge, EmptyState, Progress, Skeleton } from "@/components/ui/feedback";
@@ -30,7 +30,7 @@ const ERRORS: Record<string, string> = {
   temporary_error: "Erreur temporaire : nouvelle tentative en cours.",
   lease_expired: "Le traitement a été interrompu. Supprimez puis réimportez la source.",
 };
-const KIND_ICON: Record<string, React.ReactNode> = { web: <Globe />, text: <Type /> };
+const KIND_ICON: Record<string, React.ReactNode> = { web: <Globe />, text: <Type />, note: <NotebookPen /> };
 const busyStatus = (s: string) => s === "pending" || s === "processing";
 
 /** Vrai si la requête média correspond (suit le redimensionnement). Rendu serveur : vue bureau. */
@@ -50,6 +50,7 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
   const [loadError, setLoadError] = React.useState(false);
   const [adding, setAdding] = React.useState(false);
   const [viewer, setViewer] = React.useState<{ sourceId: string; range?: [number, number] } | null>(null);
+  const [noteEditor, setNoteEditor] = React.useState<{ id?: string } | null>(null);
   const [mobileTab, setMobileTab] = React.useState("chat");
   const desktop = useMediaQuery("(min-width: 1024px)");
 
@@ -99,7 +100,7 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
   const allSelected = ready.length > 0 && selectedCount === ready.length;
 
   const sourcesPanel = (
-    <Panel id="sources" title="Sources" className="h-full" actions={canEdit && <Button size="sm" variant="soft" onClick={() => setAdding(true)}><Plus aria-hidden /> Ajouter</Button>}>
+    <Panel id="sources" title="Sources" className="h-full" actions={canEdit && <span className="flex gap-1"><Button size="sm" variant="ghost" onClick={() => setNoteEditor({})}><NotebookPen aria-hidden /> Note</Button><Button size="sm" variant="soft" onClick={() => setAdding(true)}><Plus aria-hidden /> Ajouter</Button></span>}>
       {loadError ? (
         <div className="p-4"><Alert tone="danger" title="Sources indisponibles" action={<Button size="sm" variant="secondary" onClick={load}>Réessayer</Button>} /></div>
       ) : sources === null ? (
@@ -127,7 +128,7 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
             <div key={s.id} className="grid gap-1">
               <ListRow
                 icon={KIND_ICON[s.kind] ?? <FileText />}
-                title={s.status === "ready" ? <button className="w-full truncate text-left hover:underline" onClick={() => setViewer({ sourceId: s.id })}>{s.title}</button> : s.title}
+                title={s.kind === "note" ? <button className="w-full truncate text-left hover:underline" onClick={() => setNoteEditor({ id: s.id })}>{s.title}</button> : s.status === "ready" ? <button className="w-full truncate text-left hover:underline" onClick={() => setViewer({ sourceId: s.id })}>{s.title}</button> : s.title}
                 meta={s.status === "failed" ? <span className="text-danger">{ERRORS[s.error_code ?? ""] ?? "Échec du traitement."}</span> : busyStatus(s.status) ? (s.status === "pending" ? "En attente de traitement…" : "Extraction et indexation…") : s.word_count ? `${s.word_count.toLocaleString("fr-FR")} mots` : undefined}
                 trailing={
                   <span className="flex items-center gap-1">
@@ -150,7 +151,7 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
   );
 
   const titles = new Map((sources ?? []).map((s) => [s.id, s.title]));
-  const chatPanel = <Chat notebookId={notebookId} readyCount={selectedCount} sourceTitle={(id) => titles.get(id)} onOpenCitation={(c) => setViewer({ sourceId: c.source_id, range: [c.char_start, c.char_end] })} canViewSources={role !== "chat"} />;
+  const chatPanel = <Chat notebookId={notebookId} readyCount={selectedCount} sourceTitle={(id) => titles.get(id)} canSaveNote={canEdit} onNoteSaved={() => void load()} onOpenCitation={(c) => setViewer({ sourceId: c.source_id, range: [c.char_start, c.char_end] })} canViewSources={role !== "chat"} />;
 
   const studioPanel = (
     <Panel id="studio" title="Studio" className="h-full">
@@ -190,13 +191,23 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
 
       <AddSourcesDialog open={adding} onOpenChange={setAdding} notebookId={notebookId} onAdded={() => void load()} />
       <SourceViewer state={viewer} onClose={() => setViewer(null)} />
+      <NoteEditor state={noteEditor} notebookId={notebookId} canEdit={canEdit} onClose={() => setNoteEditor(null)} onSaved={() => void load()} />
     </>
   );
 }
 
 /* ---------------------------------------------------------------- Chat ---- */
 
-function Chat({ notebookId, readyCount, onOpenCitation, canViewSources, sourceTitle }: { notebookId: string; readyCount: number; onOpenCitation: (c: Cite) => void; canViewSources: boolean; sourceTitle: (id: string) => string | undefined }) {
+function Chat({ notebookId, readyCount, onOpenCitation, canViewSources, sourceTitle, canSaveNote, onNoteSaved }: { notebookId: string; readyCount: number; onOpenCitation: (c: Cite) => void; canViewSources: boolean; sourceTitle: (id: string) => string | undefined; canSaveNote: boolean; onNoteSaved: () => void }) {
+  const [saved, setSaved] = React.useState<Set<string>>(new Set());
+  async function saveNote(id: string) {
+    const res = await fetch(`/api/v1/messages/${id}/save-note`, { method: "POST" });
+    if (res.status === 409) { setSaved((s) => new Set(s).add(id)); toast({ title: "Cette réponse est déjà dans vos notes" }); return; }
+    if (!res.ok) { toast({ title: "Enregistrement impossible", tone: "error" }); return; }
+    setSaved((s) => new Set(s).add(id));
+    toast({ title: "Réponse enregistrée en note", description: "Elle apparaît dans vos sources et peut être citée.", tone: "success" });
+    onNoteSaved();
+  }
   const [conversationId, setConversationId] = React.useState<string | null>(null);
   const [messages, setMessages] = React.useState<Message[] | null>(null);
   const [text, setText] = React.useState("");
@@ -280,6 +291,9 @@ function Chat({ notebookId, readyCount, onOpenCitation, canViewSources, sourceTi
           ) : (
             <div key={m.id} className="grid gap-2">
               {m.content ? <Answer text={m.content} citations={m.citations ?? []} sourceTitle={sourceTitle} onOpen={canViewSources ? onOpenCitation : undefined} /> : <div className="grid gap-2" aria-label="Réponse en cours"><Skeleton className="h-4 w-11/12" /><Skeleton className="h-4 w-9/12" /></div>}
+              {canSaveNote && m.status === "complete" && m.id !== "pending" && m.content && (
+                <div><Button size="sm" variant="ghost" disabled={saved.has(m.id)} onClick={() => void saveNote(m.id)}><BookmarkPlus aria-hidden /> {saved.has(m.id) ? "Enregistrée en note" : "Enregistrer en note"}</Button></div>
+              )}
               {m.status === "stopped" && <p className="text-xs text-text-subtle">Réponse interrompue.</p>}
               {m.status === "failed" && <p className="flex items-center gap-1.5 text-xs text-danger"><AlertTriangle className="size-3.5" aria-hidden /> Réponse incomplète.</p>}
             </div>
@@ -442,6 +456,84 @@ function SourceViewer({ state, onClose }: { state: { sourceId: string; range?: [
             </p>
           )}
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ---------------------------------------------------------- Éditeur de note ---- */
+
+function NoteEditor({ state, notebookId, canEdit, onClose, onSaved }: { state: { id?: string } | null; notebookId: string; canEdit: boolean; onClose: () => void; onSaved: () => void }) {
+  const [title, setTitle] = React.useState("");
+  const [text, setText] = React.useState("");
+  const [locked, setLocked] = React.useState(false);
+  const [citations, setCitations] = React.useState(0);
+  const [loading, setLoading] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [errors, setErrors] = React.useState<Record<string, string>>({});
+  const editing = Boolean(state?.id);
+
+  React.useEffect(() => {
+    if (!state) return;
+    setErrors({});
+    if (!state.id) { setTitle(""); setText(""); setLocked(false); setCitations(0); return; }
+    setLoading(true);
+    fetch(`/api/v1/notes/${state.id}`).then(async (r) => {
+      if (!r.ok) throw new Error();
+      const j = await r.json();
+      setTitle(j.note.title); setText(j.note.text); setLocked(j.note.locked); setCitations(j.citations.length);
+    }).catch(() => setErrors({ form: "Note introuvable." })).finally(() => setLoading(false));
+  }, [state]);
+
+  async function unlock() {
+    if (!state?.id || !confirm("Retirer les citations de cette note pour pouvoir la modifier ? Les liens vers les passages cités seront perdus.")) return;
+    const r = await fetch(`/api/v1/notes/${state.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ unlock: true }) });
+    if (r.ok) { setLocked(false); setCitations(0); } else toast({ title: "Action impossible", tone: "error" });
+  }
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true); setErrors({});
+    const r = await fetch(editing ? `/api/v1/notes/${state!.id}` : `/api/v1/notebooks/${notebookId}/notes`, {
+      method: editing ? "PATCH" : "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify(locked ? { title } : { title, text }),
+    });
+    setSaving(false);
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 422) { setErrors(j.fields ?? { form: "Données invalides." }); return; }
+    if (r.status === 409) { setErrors({ form: "Cette note est verrouillée par ses citations." }); return; }
+    if (!r.ok) { setErrors({ form: "Enregistrement impossible. Réessayez." }); return; }
+    toast({ title: editing ? "Note mise à jour" : "Note créée", description: "Elle sera indexée dans quelques secondes.", tone: "success" });
+    onSaved(); onClose();
+  }
+
+  const readOnly = !canEdit;
+  return (
+    <Dialog open={Boolean(state)} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent size="lg" title={editing ? (readOnly ? "Note" : "Modifier la note") : "Nouvelle note"} description="Une note est une source : elle peut être sélectionnée et citée dans les réponses.">
+        {loading ? (
+          <div className="grid gap-2" aria-busy="true"><Skeleton className="h-9" /><Skeleton className="h-40" /></div>
+        ) : (
+          <form onSubmit={save} className="grid gap-4" noValidate>
+            {locked && (
+              <Alert tone="accent" title={`Note issue du chat, avec ${citations} citation${citations > 1 ? "s" : ""}`}
+                action={canEdit && <Button type="button" size="sm" variant="secondary" onClick={unlock}><Lock aria-hidden /> Retirer les citations</Button>}>
+                Le texte est verrouillé pour que les extraits cités restent exacts. Le titre reste modifiable.
+              </Alert>
+            )}
+            <Field id="note-title" label="Titre" error={errors.title}>
+              <Input value={title} maxLength={300} readOnly={readOnly} onChange={(e) => setTitle(e.target.value)} />
+            </Field>
+            <Field id="note-text" label="Contenu" error={errors.text}>
+              <Textarea value={text} readOnly={readOnly || locked} onChange={(e) => setText(e.target.value)} className="min-h-64 font-serif text-reading" />
+            </Field>
+            {errors.form && <Alert tone="danger" title={errors.form} />}
+            <div className="flex justify-end gap-2">
+              <DialogClose asChild><Button type="button" variant="secondary">{readOnly ? "Fermer" : "Annuler"}</Button></DialogClose>
+              {!readOnly && <Button type="submit" loading={saving}>{editing ? "Enregistrer" : "Créer la note"}</Button>}
+            </div>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );
