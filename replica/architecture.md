@@ -253,6 +253,8 @@ création (pending) ─► fetch/lecture ─► détection MIME réelle ─► e
 6. **Hors sources** : si aucun chunk ne dépasse le seuil ou si la question demande une création libre, le modèle répond qu'il ne trouve pas l'information dans les sources. C'est le comportement de l'original, imposé par le prompt et vérifié dans le jeu de test.
 7. **Échelle** : le scan exact suffit jusqu'à environ 20 000 chunks par notebook (environ 600 sources moyennes). Au-delà, on active l'index HNSW avec `hnsw.iterative_scan`. Ce n'est pas nécessaire au MVP.
 
+> **Mise à jour 2026-11-09 (décision de l'utilisateur)** : le chat **et** les embeddings passent par **OpenRouter** (API compatible OpenAI, `apps/web/lib/ai/openrouter.ts`, `apps/worker/src/ai/embeddings.ts`). Les citations natives de Claude (mécanisme A ci-dessous) ne sont pas exposées par cette API. Le chat utilise donc le **mécanisme B, étendu à la prose** : passages numérotés `<passage n>`, citations `[n]` dans la réponse, résolution et vérification serveur (`apps/web/lib/rag/citations.ts`). Les numéros absents des passages sont supprimés ; l'extrait affiché est une phrase exacte du passage, avec ses offsets absolus. Le § 11 (SDK Anthropic) est remplacé par ce connecteur ; les modèles se choisissent par configuration (`OPENROUTER_CHAT_MODEL`).
+
 ## 10. Citations vérifiables
 
 On utilise deux mécanismes, parce que les **citations natives de Claude sont incompatibles avec les sorties structurées** (`output_config.format` renvoie une erreur 400).

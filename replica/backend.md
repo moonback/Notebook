@@ -17,18 +17,25 @@ Les clés présentes dans `.env.local` et `apps/worker/.env` sont les **clés de
 | Sécurité de l'import d'URL | ✅ protection SSRF : DNS résolu une fois, IP privées et métadonnées refusées, ports 80/443, redirections revérifiées, 10 Mo, 15 s | 21 tests |
 | Journalisation | 🟡 JSON structuré sans données utilisateur (champs `token`, `key`, `email`… masqués) côté web | `lib/log.ts` ; pas encore Sentry |
 
-## Ce qui reste à faire (ordre proposé)
+## Ajouté le 2026-11-09 (décisions de l'utilisateur)
 
-| domaine | bloquant | ce que je ferai dès que c'est débloqué |
+| domaine | état | preuve |
 | --- | --- | --- |
-| **Connecteur Claude + API de conversation** (SSE, citations natives vérifiées) | **Clé `ANTHROPIC_API_KEY`** à ajouter par vous dans `apps/web/.env.local` | `POST /conversations/:id/messages` en streaming, quota `chat` réservé puis réglé, citations vérifiées et stockées |
-| **Embeddings** (recherche vectorielle) | Choix D1 + clé (`EMBEDDINGS_PROVIDER` / `MODEL` / `API_KEY` dans `apps/worker/.env`) | Sans clé, la recherche est en **plein texte uniquement** (journalisé, sans faux vecteurs) |
-| **Abonnements et paiements** | Compte Stripe **en mode test** + `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, prix créés | Checkout, Customer Portal, webhook signé et idempotent (`stripe_events`), mise à jour de `subscriptions` et `workspaces.plan_id` |
-| Quotas : affichage et usage dans le chat | dépend du chat | Les RPC sont prêtes et testées (`reserve_usage`, `settle_usage`, `create_artifact`) |
-| Email transactionnel | Compte Resend + domaine | Invitations, notifications |
-| Surveillance | Projet Sentry (DSN) | Erreurs web et worker |
-| Suppression de compte, export RGPD | — | Jobs `delete_account` et `export_account` (M4) |
-| OCR (PDF scannés), audio | Fournisseur à choisir | Aujourd'hui : erreur explicite `needs_ocr`, jamais de faux succès |
+| **IA via OpenRouter** (chat + embeddings) | ✅ connecteur unique, compatible OpenAI ; modèles et clé dans la configuration, sans nom de modèle codé en dur | parcours complet testé contre un **faux serveur OpenRouter local** ; sans clé, `503 ai_not_configured` (aucune réponse inventée) |
+| **API de conversation** | ✅ `POST /api/v1/conversations/:id/messages` en SSE (`meta`, `delta`, `done`, `error`) ; recherche hybride (vecteur + plein texte) ; historique privé ; arrêt client = statut `stopped` | test de bout en bout : réponse en flux, message et citation enregistrés |
+| **Citations vérifiables** | ✅ le modèle cite les passages fournis par `[n]` ; le serveur **supprime les numéros inventés**, renumérote, choisit la phrase citée et stocke les offsets absolus (`verified`) | 5 tests unitaires + parcours réel (`[9]` inventé retiré) |
+| **Quotas** | ✅ crédit `chat` réservé avant l'appel IA, confirmé à la fin, **rendu** en cas de panne du fournisseur | ledger vérifié en base |
+| **Facturation** | ✅ **SIMULÉE** (`BILLING_MODE=simulated`) : même contrat que Stripe (checkout → abonnement → `plan_id`, annulation en un clic), lignes marquées `sim_…`, journal d'audit. **Aucun paiement réel.** `BILLING_MODE=stripe` renvoie `501 billing_not_configured` | test : passage en Pro, plan invalide 422, annulation, workspace d'autrui 404 |
+
+## Ce qui reste à faire
+
+| domaine | ce qu'il faut |
+| --- | --- |
+| Clés OpenRouter | `OPENROUTER_API_KEY` et `OPENROUTER_CHAT_MODEL` dans `apps/web/.env.local` ; `EMBEDDINGS_MODEL` et `EMBEDDINGS_API_KEY` dans `apps/worker/.env`, plus `OPENROUTER_EMBEDDINGS_MODEL` côté web (**même modèle**, 1024 dimensions) |
+| Stripe réel | Clés de test, puis Checkout, Customer Portal et webhook signé et idempotent (table `stripe_events` prête) |
+| Email (Resend), Sentry, OCR, audio | Comptes ou fournisseurs à choisir |
+| Limitation de débit `/api/*`, `pnpm audit` | Avant le déploiement |
+| Interface | Les écrans (S03, S08, chat) consomment ces API à partir du prochain lot de `/replica-build` |
 
 ## Checklist de sécurité
 
@@ -47,7 +54,7 @@ Les clés présentes dans `.env.local` et `apps/worker/.env` sont les **clés de
 ```
 pnpm db:start          # Supabase local
 pnpm db:test           # pgTAP (24)
-pnpm -r test           # Vitest web (6) + worker (33, dont intégration)
+pnpm -r test           # Vitest web (11) + worker (33, dont intégration)
 pnpm -r typecheck
 pnpm --dir apps/worker start   # worker (handler ingest_source)
 ```
