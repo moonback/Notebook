@@ -16,7 +16,7 @@ Date : 2026-11-09. Chaque question renvoie à un écran (Sxx), un parcours (Fxx)
 
 | # | hypothèse | comment vérifier | écran |
 | --- | --- | --- | --- |
-| Q06 | Le tableau de bord propose une vue grille et une vue liste, un tri (récent, titre) et des filtres (« Tous / Mes notebooks / Partagés »). Le mobile documente des onglets Recent, Shared, Title, Downloaded. | capture de S03 | S03 |
+| Q06 | ~~Vue grille/liste, tri, filtres~~ **Résolue (capture 2026-11-09)** : onglets Tous / Mes notebooks / Découvrir / Collections, recherche, grille/liste, tri, colonnes Titre/Sources/Création/Rôle. Reste à voir : contenu de « Collections » (dossiers de notebooks ? non documenté) et du menu ⋮ | capture de Collections et du menu ⋮ | S03 |
 | Q07 | La sélection des sources (cases à cocher) est-elle mémorisée par utilisateur ou partagée entre les collaborateurs ? | deux comptes sur un notebook partagé | S09 |
 | Q08 | Un seul fil de chat par notebook (pas de multi-conversations) ? Seul « Delete chat history » est documenté. | menu ⋮ du chat | S11 |
 | Q09 | Le titre du notebook est-il généré automatiquement (comme l'emoji) ? Comment le renomme-t-on ? | créer un notebook, cliquer sur le titre | S08, F23 |

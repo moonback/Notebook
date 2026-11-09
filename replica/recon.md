@@ -10,7 +10,7 @@
 
 | niveau | sens | volume |
 | --- | --- | --- |
-| **Observé (OBS)** | Vu directement. **Uniquement la landing publique S01.** Aucune interface derrière la connexion n'a été vue ni testée. | 1 écran |
+| **Observé (OBS)** | Vu directement : la landing publique S01, puis le tableau de bord S03 et la vue notebook S08 grâce aux captures de l'utilisateur (`capture/`, 2026-11-09). Aucune fonction n'a été *testée* par nous. | 3 écrans |
 | **Documenté (DOC)** | Tiré des 26 articles d'aide officiels lisibles, en paraphrase et avec le n° d'article. | ~80 % du contenu |
 | **Hypothèse (HYP)** | Déduction à valider sur captures (liste dans `open-questions.md` § E). | tableau de bord, renommer/supprimer, états vides et d'erreur |
 | **Inaccessible (INA)** | 18+, abonnement, Workspace, Play Books, mobile, mode interactif. | voir Q21 à Q26 |
@@ -388,22 +388,22 @@ Prix indicatifs aux États-Unis, issus de sources tierces et non vérifiés : Pl
 
 ## 5. Modèle de données
 
-Voir [data-model-observations.md](data-model-observations.md) : 21 entités et 12 règles métier documentées.
+Voir [data-model-observations.md](data-model-observations.md) : 22 entités (dont Collection, observée) et 12 règles métier documentées.
 Point clé : **une note est une source**, et un artefact garde un **instantané** des sources utilisées.
 
 ## 6. Matrice des fonctionnalités
 
-Voir [features.csv](features.csv) : **86 lignes**.
+Voir [features.csv](features.csv) : **88 lignes** (A07 Collections et A08 Recherche du tableau de bord ajoutées après les captures ; B05 YouTube passée en P2).
 
 | | nombre |
 | --- | --- |
 | P0 | 22 |
 | P1 | 25 |
-| P2 | 21 |
+| P2 | 23 |
 | P3 | 18 |
 | must | 22 |
 | should | 25 |
-| could | 39 |
+| could | 41 |
 | skip | 7 |
 | fonctions absentes de l'original (différenciation, `original=no`) | 8 |
 
@@ -477,7 +477,7 @@ Pistes pour un produit vendable :
 | Mobile | ⚪ annexe | hors périmètre |
 
 **Non fait** :
-- aucune interface authentifiée vue ;
+- interface authentifiée vue uniquement sur 2 captures statiques (S03, S08) fournies par l'utilisateur ; aucune interaction testée ;
 - inventaire de l'aide **non exhaustif** : 28 articles repérés via les liens de l'accueil de l'aide et d'un seul article, sans parcours du sitemap (choix délibéré : pas de crawl). « Toutes les pages publiques » n'est donc pas garanti ;
 - pas de changelog officiel, ni de fiches stores, ni de vidéos ;
 - pas d'avis utilisateurs (→ `/replica-entrepreneur`) ;

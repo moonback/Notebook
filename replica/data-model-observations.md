@@ -32,6 +32,11 @@ NotebookMember            (partage privé)
   evidence: 16206563
   confidence: haute
 
+Collection                (onglet « Collections » observé sur S03, fonctionnement inconnu)
+  id, owner_id, name ; CollectionNotebook (collection_id, notebook_id)
+  evidence: capture/liste-notebook.PNG
+  confidence: supposition (seul l'onglet est observé)
+
 NotebookVisit             (notebook public ou featured ajouté à l'accueil d'un visiteur)
   notebook_id, user_id, first_opened_at, removed (bool)
   evidence: 16322204 (« Remove notebook », disparition quand le notebook redevient privé)
