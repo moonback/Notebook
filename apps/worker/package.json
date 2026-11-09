@@ -8,7 +8,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.119.0"
+    "@mozilla/readability": "~0.6.0",
+    "@supabase/supabase-js": "^2.119.0",
+    "linkedom": "~0.18.15",
+    "mammoth": "^1.13.0",
+    "unpdf": "^1.9.1"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

@@ -1,6 +1,8 @@
 import { hostname } from "node:os";
 import { createClient } from "@supabase/supabase-js";
 import { runOnce, type Handler, type JobKind } from "./worker.ts";
+import { embedderFromEnv } from "./ai/embeddings.ts";
+import { ingestHandler } from "./ingest/handler.ts";
 
 const url = process.env.SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -11,8 +13,13 @@ if (!url || !key) {
 const db = createClient(url, key, { auth: { persistSession: false } });
 const workerId = process.env.WORKER_ID || `${hostname()}-${process.pid}`;
 
-// Les handlers arrivent avec chaque jalon (M1 : ingest_source…). Aucun handler factice ici.
-const handlers: Partial<Record<JobKind, Handler>> = {};
+const embedder = embedderFromEnv();
+if (!embedder) console.warn("EMBEDDINGS_* non configuré : indexation en plein texte uniquement (pas de recherche vectorielle).");
+
+// Un handler par type de job réellement implémenté ; les autres types ne sont pas réclamés.
+const handlers: Partial<Record<JobKind, Handler>> = {
+  ingest_source: ingestHandler(db, embedder),
+};
 
 let stopping = false;
 process.on("SIGTERM", () => (stopping = true));
