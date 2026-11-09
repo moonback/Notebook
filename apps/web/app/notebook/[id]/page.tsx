@@ -21,7 +21,7 @@ export default async function NotebookPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="flex h-dvh flex-col">
-      <AppHeader />
+      <AppHeader notebookId={id} />
       <Workspace notebookId={id} initialTitle={nb.title} role={role as Role} />
     </div>
   );

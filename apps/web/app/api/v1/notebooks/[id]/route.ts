@@ -6,28 +6,35 @@ import { createServiceClient, createUserClient } from "@/lib/supabase/server";
 
 type Params = { params: Promise<{ id: string }> };
 
-/** En-tête du notebook + rôle courant. */
+/** En-tête du notebook, réglages du chat, résumé et questions suggérées (C03), rôle courant. */
 export const GET = handle(async (_req: NextRequest, { params }: Params) => {
   await requireUser();
   const { id } = await params;
   const role = await requireRole(id, "chat");
   const supabase = await createUserClient();
-  const { data } = await supabase.from("notebooks").select("id, title, emoji, created_at, last_activity_at").eq("id", id).single();
-  return NextResponse.json({ notebook: data, role });
+  const [{ data }, { count: pending }] = await Promise.all([
+    supabase.from("notebooks").select("id, title, emoji, created_at, last_activity_at, chat_style, chat_custom_prompt, response_length, overview, suggested_questions").eq("id", id).single(),
+    createServiceClient().from("jobs").select("id", { count: "exact", head: true }).eq("notebook_id", id).eq("kind", "notebook_overview").in("status", ["queued", "running"]),
+  ]);
+  return NextResponse.json({ notebook: data, role, overviewPending: Boolean(pending) });
 });
 
 const patchSchema = z.object({
   title: z.string().trim().max(200, "200 caractères maximum."),
   emoji: z.string().trim().max(16).nullable(),
-}).partial().strict().refine((v) => Object.keys(v).length > 0, "Aucune modification.");
+  chat_style: z.enum(["default", "learning_guide", "custom"]),
+  chat_custom_prompt: z.string().trim().max(4000, "4 000 caractères maximum.").nullable(),
+  response_length: z.enum(["short", "default", "long"]),
+}).partial().strict().refine((v) => Object.keys(v).length > 0, "Aucune modification.")
+  .refine((v) => v.chat_style !== "custom" || Boolean(v.chat_custom_prompt), { message: "Décrivez le rôle ou le style souhaité.", path: ["chat_custom_prompt"] });
 
-/** Renommer / changer l'emoji (éditeur et plus). */
+/** Renommer, emoji, réglages du chat (éditeur et plus). */
 export const PATCH = handle(async (req: NextRequest, { params }: Params) => {
   await requireUser();
   const { id } = await params;
   await requireRole(id, "editor");
   const body = await parseBody(req, patchSchema);
-  const { data, error } = await createServiceClient().from("notebooks").update(body).eq("id", id).select("id, title, emoji").single();
+  const { data, error } = await createServiceClient().from("notebooks").update(body).eq("id", id).select("id, title, emoji, chat_style, chat_custom_prompt, response_length").single();
   if (error) throw error;
   return NextResponse.json({ notebook: data });
 });

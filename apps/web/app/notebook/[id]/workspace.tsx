@@ -1,6 +1,6 @@
 "use client";
 import * as React from "react";
-import { AlertTriangle, ArrowUp, BookmarkPlus, FileText, Globe, Inbox, Lock, NotebookPen, Plus, Square, Sparkles, Trash2, Type, Upload } from "lucide-react";
+import { AlertTriangle, ArrowUp, BookmarkPlus, Eraser, Settings2, ThumbsDown, ThumbsUp, FileText, Globe, Inbox, Lock, NotebookPen, Pencil, Plus, Square, Sparkles, Trash2, Type, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { Alert, Badge, EmptyState, Progress, Skeleton } from "@/components/ui/feedback";
@@ -10,11 +10,13 @@ import { ListRow, Panel } from "@/components/ui/surfaces";
 import { Citation } from "@/components/ui/citation";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
+import { Studio } from "./studio";
 
 export type Role = "chat" | "viewer" | "editor" | "owner";
 type Source = { id: string; kind: string; title: string; status: string; error_code: string | null; word_count: number | null };
 type Cite = { marker: number; source_id: string; quote_text: string; char_start: number; char_end: number; verified: boolean };
-type Message = { id: string; role: "user" | "assistant"; content: string; status: string; citations?: Cite[] };
+type Overview = { text: string | null; questions: string[]; pending: boolean };
+type Message = { id: string; role: "user" | "assistant"; content: string; status: string; citations?: Cite[]; feedback?: number | null };
 
 const ERRORS: Record<string, string> = {
   protected_pdf: "PDF protégé : retirez la protection puis réimportez-le.",
@@ -52,8 +54,21 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
   const [adding, setAdding] = React.useState(false);
   const [viewer, setViewer] = React.useState<{ sourceId: string; range?: [number, number] } | null>(null);
   const [noteEditor, setNoteEditor] = React.useState<{ id?: string } | null>(null);
+  const [renaming, setRenaming] = React.useState<Source | null>(null);
   const [mobileTab, setMobileTab] = React.useState("chat");
+  const [draft, setDraft] = React.useState<{ text: string } | null>(null); // question pré-remplie depuis le Studio
   const desktop = useMediaQuery("(min-width: 1024px)");
+  const [overview, setOverview] = React.useState<Overview | null>(null);
+  const loadOverview = React.useCallback(async () => {
+    try {
+      const r = await fetch(`/api/v1/notebooks/${notebookId}`);
+      if (!r.ok) return;
+      const j = await r.json();
+      setOverview({ text: j.notebook.overview, questions: j.notebook.suggested_questions ?? [], pending: j.overviewPending });
+    } catch { /* le résumé est facultatif : le chat reste utilisable */ }
+  }, [notebookId]);
+  React.useEffect(() => { void loadOverview(); }, [loadOverview]);
+  const ask = (text: string) => { setViewer(null); setDraft({ text }); setMobileTab("chat"); };
 
   const load = React.useCallback(async () => {
     if (role === "chat") return setSources([]);
@@ -75,6 +90,17 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
     const t = setInterval(() => void load(), 2500);
     return () => clearInterval(t);
   }, [processing, load]);
+  // Le résumé est programmé juste après l'ingestion (puis différé) : on le suit tant qu'il est attendu.
+  React.useEffect(() => {
+    if (processing) return;
+    const once = setTimeout(() => void loadOverview(), 2000);
+    return () => clearTimeout(once);
+  }, [processing, loadOverview]);
+  React.useEffect(() => {
+    if (!overview?.pending) return;
+    const t = setInterval(() => void loadOverview(), 5000);
+    return () => clearInterval(t);
+  }, [overview?.pending, loadOverview]);
 
   async function saveSelection(next: Set<string>) {
     setDeselected(next);
@@ -89,10 +115,18 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
     if (res.ok) setTitle(clean); else toast({ title: "Renommage impossible", tone: "error" });
   }
 
+  async function renameSource(id: string, title: string): Promise<string | null> {
+    const res = await fetch(`/api/v1/sources/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ title }) });
+    if (res.status === 422) return (await res.json()).fields?.title ?? "Titre invalide.";
+    if (!res.ok) return "Renommage impossible. Réessayez.";
+    setSources((xs) => xs?.map((x) => (x.id === id ? { ...x, title: title.trim() } : x)) ?? null);
+    return null;
+  }
+
   async function removeSource(s: Source) {
     if (!confirm(`Supprimer la source « ${s.title} » ? Les réponses passées gardent leurs extraits cités.`)) return;
     const res = await fetch(`/api/v1/sources/${s.id}`, { method: "DELETE" });
-    if (res.ok) { setSources((xs) => xs?.filter((x) => x.id !== s.id) ?? null); toast({ title: "Source supprimée", tone: "success" }); }
+    if (res.ok) { setSources((xs) => xs?.filter((x) => x.id !== s.id) ?? null); toast({ title: "Source supprimée", tone: "success" }); void loadOverview(); }
     else toast({ title: "Suppression impossible", tone: "error" });
   }
 
@@ -135,6 +169,7 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
                   <span className="flex items-center gap-1">
                     {s.status === "failed" && <Badge tone="danger">Échec</Badge>}
                     {busyStatus(s.status) && <Badge tone="accent">En cours</Badge>}
+                    {canEdit && s.kind !== "note" && <Button size="icon-sm" variant="ghost" aria-label={`Renommer ${s.title}`} className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100" onClick={() => setRenaming(s)}><Pencil aria-hidden /></Button>}
                     {canEdit && <Button size="icon-sm" variant="ghost" aria-label={`Supprimer ${s.title}`} className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100" onClick={() => removeSource(s)}><Trash2 aria-hidden /></Button>}
                     {s.status === "ready" && (
                       <Checkbox checked={!deselected.has(s.id)} aria-label={`Utiliser ${s.title} dans les réponses`}
@@ -152,14 +187,12 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
   );
 
   const titles = new Map((sources ?? []).map((s) => [s.id, s.title]));
-  const chatPanel = <Chat notebookId={notebookId} readyCount={selectedCount} sourceTitle={(id) => titles.get(id)} canSaveNote={canEdit} onNoteSaved={() => void load()} onOpenCitation={(c) => setViewer({ sourceId: c.source_id, range: [c.char_start, c.char_end] })} canViewSources={role !== "chat"} />;
+  const chatPanel = <Chat notebookId={notebookId} readyCount={selectedCount} sourceTitle={(id) => titles.get(id)} canSaveNote={canEdit} onNoteSaved={() => void load()} onOpenCitation={(c) => setViewer({ sourceId: c.source_id, range: [c.char_start, c.char_end] })} canViewSources={role !== "chat"} draft={draft} canConfigure={canEdit} overview={overview} />;
 
   const studioPanel = (
-    <Panel id="studio" title="Studio" className="h-full">
-      <EmptyState icon={<Sparkles />} title="Bientôt disponible">
-        Résumés audio, cartes mentales, fiches et quiz générés à partir de vos sources arriveront dans une prochaine version.
-      </EmptyState>
-    </Panel>
+    <Studio notebookId={notebookId} canEdit={canEdit} sourceIds={ready.filter((s) => !deselected.has(s.id)).map((s) => s.id)} sourceTitle={(id) => titles.get(id)}
+      onOpenCitation={role !== "chat" ? (c) => setViewer({ sourceId: c.source_id, range: [c.char_start, c.char_end] }) : undefined}
+      onAsk={ask} />
   );
 
   return (
@@ -191,7 +224,8 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
       )}
 
       <AddSourcesDialog open={adding} onOpenChange={setAdding} notebookId={notebookId} onAdded={() => void load()} />
-      <SourceViewer state={viewer} onClose={() => setViewer(null)} />
+      <SourceViewer state={viewer} onClose={() => setViewer(null)} onAsk={ask} />
+      <RenameSourceDialog source={renaming} onClose={() => setRenaming(null)} onRename={renameSource} />
       <NoteEditor state={noteEditor} notebookId={notebookId} canEdit={canEdit} onClose={() => setNoteEditor(null)} onSaved={() => void load()} />
     </>
   );
@@ -199,7 +233,7 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
 
 /* ---------------------------------------------------------------- Chat ---- */
 
-function Chat({ notebookId, readyCount, onOpenCitation, canViewSources, sourceTitle, canSaveNote, onNoteSaved }: { notebookId: string; readyCount: number; onOpenCitation: (c: Cite) => void; canViewSources: boolean; sourceTitle: (id: string) => string | undefined; canSaveNote: boolean; onNoteSaved: () => void }) {
+function Chat({ notebookId, readyCount, onOpenCitation, canViewSources, sourceTitle, canSaveNote, onNoteSaved, draft, canConfigure, overview }: { notebookId: string; readyCount: number; onOpenCitation: (c: Cite) => void; canViewSources: boolean; sourceTitle: (id: string) => string | undefined; canSaveNote: boolean; onNoteSaved: () => void; draft: { text: string } | null; canConfigure: boolean; overview: Overview | null }) {
   const [saved, setSaved] = React.useState<Set<string>>(new Set());
   async function saveNote(id: string) {
     const res = await fetch(`/api/v1/messages/${id}/save-note`, { method: "POST" });
@@ -212,9 +246,17 @@ function Chat({ notebookId, readyCount, onOpenCitation, canViewSources, sourceTi
   const [conversationId, setConversationId] = React.useState<string | null>(null);
   const [messages, setMessages] = React.useState<Message[] | null>(null);
   const [text, setText] = React.useState("");
+  React.useEffect(() => { if (draft) setText(draft.text); }, [draft]);
   const [streaming, setStreaming] = React.useState(false);
   const [error, setError] = React.useState<{ title: string; body?: string } | null>(null);
   const abort = React.useRef<AbortController | null>(null);
+  const [configuring, setConfiguring] = React.useState(false);
+  async function clearHistory() {
+    if (!conversationId || !confirm("Effacer tout l’historique de cette conversation ? Les notes enregistrées sont conservées.")) return;
+    const r = await fetch(`/api/v1/conversations/${conversationId}/messages`, { method: "DELETE" });
+    if (r.ok) { setMessages([]); setError(null); toast({ title: "Historique effacé" }); }
+    else toast({ title: "Effacement impossible", tone: "error" });
+  }
   const bottom = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -231,9 +273,9 @@ function Chat({ notebookId, readyCount, onOpenCitation, canViewSources, sourceTi
   }, [notebookId]);
   React.useEffect(() => { bottom.current?.scrollIntoView({ block: "end" }); }, [messages]);
 
-  async function send(e?: React.FormEvent) {
+  async function send(e?: React.FormEvent, preset?: string) {
     e?.preventDefault();
-    const q = text.trim();
+    const q = (preset ?? text).trim();
     if (!q || streaming || !conversationId) return;
     setText(""); setError(null); setStreaming(true);
     const tmp: Message = { id: "pending", role: "assistant", content: "", status: "streaming" };
@@ -279,14 +321,36 @@ function Chat({ notebookId, readyCount, onOpenCitation, canViewSources, sourceTi
 
   return (
     <section aria-label="Conversation" className="flex h-full min-h-0 flex-col rounded-xl border bg-surface-raised">
+      <div className="flex h-11 shrink-0 items-center justify-end gap-1 border-b px-2">
+        {canConfigure && <Button size="sm" variant="ghost" onClick={() => setConfiguring(true)}><Settings2 aria-hidden /> Configurer</Button>}
+        <Button size="sm" variant="ghost" disabled={!messages?.length || streaming} onClick={() => void clearHistory()}><Eraser aria-hidden /> Effacer l’historique</Button>
+      </div>
+      <ChatSettingsDialog open={configuring} onClose={() => setConfiguring(false)} notebookId={notebookId} />
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6">
         <div className="mx-auto grid max-w-[var(--chat-max-w)] gap-6" aria-live="polite" aria-busy={streaming}>
           {messages === null ? (
             <div className="grid gap-2" aria-busy="true" aria-label="Chargement"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-4 w-1/2" /></div>
           ) : messages.length === 0 ? (
-            <EmptyState icon={<Sparkles />} title={readyCount ? "Posez votre première question" : "Ajoutez une source pour commencer"}>
-              {readyCount ? "Les réponses s’appuient uniquement sur vos sources sélectionnées et citent leurs passages." : "Dès qu’une source est prête, vous pourrez l’interroger ici."}
-            </EmptyState>
+            overview?.text && readyCount ? (
+              <div className="grid gap-4">
+                <h2 className="text-sm font-medium text-text-muted">Résumé de vos sources</h2>
+                <p className="font-serif text-reading">{overview.text}</p>
+                {overview.questions.length > 0 && (
+                  <div className="grid gap-2">
+                    <p className="text-sm text-text-muted">Pour commencer :</p>
+                    {overview.questions.map((q) => (
+                      <Button key={q} variant="secondary" className="h-auto justify-start whitespace-normal py-2 text-left" disabled={streaming || !conversationId} onClick={() => void send(undefined, q)}>{q}</Button>
+                    ))}
+                  </div>
+                )}
+                {overview.pending && <p className="text-xs text-text-subtle">Mise à jour du résumé en cours…</p>}
+              </div>
+            ) : (
+              <EmptyState icon={<Sparkles />} title={readyCount ? "Posez votre première question" : "Ajoutez une source pour commencer"}>
+                {readyCount ? "Les réponses s’appuient uniquement sur vos sources sélectionnées et citent leurs passages." : "Dès qu’une source est prête, vous pourrez l’interroger ici."}
+                {readyCount > 0 && overview?.pending && <span className="mt-2 block text-xs text-text-subtle">Résumé de vos sources en préparation…</span>}
+              </EmptyState>
+            )
           ) : messages.map((m) => m.role === "user" ? (
             <div key={m.id} className="max-w-[85%] justify-self-end whitespace-pre-wrap rounded-xl rounded-br-xs bg-surface px-4 py-2.5 text-sm">{m.content}</div>
           ) : (
@@ -295,7 +359,8 @@ function Chat({ notebookId, readyCount, onOpenCitation, canViewSources, sourceTi
               {canSaveNote && m.status === "complete" && m.id !== "pending" && m.content && (
                 <div><Button size="sm" variant="ghost" disabled={saved.has(m.id)} onClick={() => void saveNote(m.id)}><BookmarkPlus aria-hidden /> {saved.has(m.id) ? "Enregistrée en note" : "Enregistrer en note"}</Button></div>
               )}
-              {m.status === "stopped" && <p className="text-xs text-text-subtle">Réponse interrompue.</p>}
+              {m.id !== "pending" && m.content && m.status !== "streaming" && <Feedback messageId={m.id} initial={m.feedback ?? null} />}
+              {m.status === "stopped" && <p className="text-xs text-text-subtle">Réponse interrompue : le texte partiel est conservé.</p>}
               {m.status === "failed" && <p className="flex items-center gap-1.5 text-xs text-danger"><AlertTriangle className="size-3.5" aria-hidden /> Réponse incomplète.</p>}
             </div>
           ))}
@@ -339,6 +404,105 @@ function Answer({ text, citations, onOpen, sourceTitle }: { text: string; citati
         </p>
       ))}
     </div>
+  );
+}
+
+/** Pouce haut / bas ; un avis négatif peut porter un motif facultatif. */
+function Feedback({ messageId, initial }: { messageId: string; initial: number | null }) {
+  const [value, setValue] = React.useState(initial);
+  const [asking, setAsking] = React.useState(false);
+  const [reason, setReason] = React.useState("");
+  async function save(v: number | null, why?: string) {
+    const prev = value;
+    setValue(v);
+    const r = await fetch(`/api/v1/messages/${messageId}/feedback`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ value: v, ...(why ? { reason: why } : {}) }) });
+    if (!r.ok) { setValue(prev); toast({ title: "Avis non enregistré", tone: "error" }); return false; }
+    return true;
+  }
+  return (
+    <div className="grid gap-2">
+      <div className="flex items-center gap-1">
+        <Button size="icon-sm" variant="ghost" aria-label="Réponse utile" aria-pressed={value === 1} className={cn(value === 1 && "text-accent")}
+          onClick={() => { setAsking(false); void save(value === 1 ? null : 1); }}><ThumbsUp aria-hidden /></Button>
+        <Button size="icon-sm" variant="ghost" aria-label="Réponse à améliorer" aria-pressed={value === -1} className={cn(value === -1 && "text-danger")}
+          onClick={() => { if (value === -1) { setAsking(false); void save(null); } else { void save(-1); setAsking(true); } }}><ThumbsDown aria-hidden /></Button>
+      </div>
+      {asking && (
+        <form className="grid max-w-md gap-2" onSubmit={async (e) => { e.preventDefault(); if (await save(-1, reason.trim() || undefined)) { setAsking(false); toast({ title: "Merci pour votre retour" }); } }}>
+          <Field id={`fb-${messageId}`} label="Qu’est-ce qui n’allait pas ? (facultatif)">
+            <Textarea value={reason} maxLength={2000} onChange={(e) => setReason(e.target.value)} className="min-h-16" />
+          </Field>
+          <div className="flex gap-2"><Button size="sm" type="submit">Envoyer</Button><Button size="sm" type="button" variant="ghost" onClick={() => setAsking(false)}>Passer</Button></div>
+        </form>
+      )}
+    </div>
+  );
+}
+
+/** Réglages du chat par notebook (C08) : style et longueur des réponses suivantes. */
+function ChatSettingsDialog({ open, onClose, notebookId }: { open: boolean; onClose: () => void; notebookId: string }) {
+  const [form, setForm] = React.useState<{ chat_style: string; chat_custom_prompt: string; response_length: string } | null>(null);
+  const [failed, setFailed] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState<string>();
+  React.useEffect(() => {
+    if (!open) return;
+    setForm(null); setFailed(false); setError(undefined);
+    fetch(`/api/v1/notebooks/${notebookId}`).then(async (r) => {
+      if (!r.ok) throw new Error();
+      const { notebook: n } = await r.json();
+      setForm({ chat_style: n.chat_style, chat_custom_prompt: n.chat_custom_prompt ?? "", response_length: n.response_length });
+    }).catch(() => setFailed(true));
+  }, [open, notebookId]);
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form) return;
+    if (form.chat_style === "custom" && !form.chat_custom_prompt.trim()) { setError("Décrivez le rôle ou le style souhaité."); return; }
+    setSaving(true);
+    const r = await fetch(`/api/v1/notebooks/${notebookId}`, { method: "PATCH", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_style: form.chat_style, response_length: form.response_length, chat_custom_prompt: form.chat_style === "custom" ? form.chat_custom_prompt.trim() : null }) });
+    setSaving(false);
+    if (!r.ok) { setError("Enregistrement impossible. Réessayez."); return; }
+    toast({ title: "Réglages du chat enregistrés", description: "Ils s’appliquent aux prochaines réponses.", tone: "success" });
+    onClose();
+  }
+  const radio = (name: "chat_style" | "response_length", options: [string, string, string?][]) => (
+    <div role="radiogroup" className="grid gap-2">
+      {options.map(([v, l, hint]) => (
+        <label key={v} className={cn("flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm", form?.[name] === v && "border-accent bg-accent-soft text-on-accent-soft")}>
+          <input type="radio" name={name} value={v} checked={form?.[name] === v} onChange={() => setForm((f) => f && { ...f, [name]: v })} className="mt-0.5 accent-[var(--color-accent)]" />
+          <span><span className="font-medium">{l}</span>{hint && <span className="block text-xs opacity-80">{hint}</span>}</span>
+        </label>
+      ))}
+    </div>
+  );
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent title="Configurer le chat" description="S’applique à tous les membres de ce notebook, pour les prochaines réponses.">
+        {failed ? <Alert tone="danger" title="Réglages indisponibles" /> : !form ? (
+          <div className="grid gap-2" aria-busy="true" aria-label="Chargement"><Skeleton className="h-12" /><Skeleton className="h-12" /></div>
+        ) : (
+          <form onSubmit={submit} className="grid gap-5">
+            <fieldset className="grid gap-2"><legend className="mb-2 text-sm font-medium">Style</legend>
+              {radio("chat_style", [["default", "Par défaut", "Recherche et réponses générales"], ["learning_guide", "Guide d’apprentissage", "Explique pas à pas et vérifie la compréhension"], ["custom", "Personnalisé", "Vous décrivez le rôle et le ton"]])}
+            </fieldset>
+            {form.chat_style === "custom" && (
+              <Field id="chat-custom" label="Rôle et ton souhaités" error={error}>
+                <Textarea value={form.chat_custom_prompt} maxLength={4000} onChange={(e) => { setError(undefined); setForm({ ...form, chat_custom_prompt: e.target.value }); }} placeholder="Ex. : réponds comme un formateur technique, avec des listes concises." />
+              </Field>
+            )}
+            <fieldset className="grid gap-2"><legend className="mb-2 text-sm font-medium">Longueur des réponses</legend>
+              {radio("response_length", [["short", "Courte"], ["default", "Normale"], ["long", "Détaillée"]])}
+            </fieldset>
+            {error && form.chat_style !== "custom" && <p role="alert" className="text-sm text-danger">{error}</p>}
+            <div className="flex justify-end gap-2">
+              <DialogClose asChild><Button type="button" variant="secondary">Annuler</Button></DialogClose>
+              <Button type="submit" loading={saving}>Enregistrer</Button>
+            </div>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -432,8 +596,8 @@ function AddSourcesDialog({ open, onOpenChange, notebookId, onAdded }: { open: b
 
 /* --------------------------------------------------------- Visionneuse ---- */
 
-function SourceViewer({ state, onClose }: { state: { sourceId: string; range?: [number, number] } | null; onClose: () => void }) {
-  const [source, setSource] = React.useState<{ title: string; extracted_text: string | null } | null>(null);
+function SourceViewer({ state, onClose, onAsk }: { state: { sourceId: string; range?: [number, number] } | null; onClose: () => void; onAsk: (text: string) => void }) {
+  const [source, setSource] = React.useState<{ title: string; extracted_text: string | null; guide: { summary: string; topics: string[] } | null } | null>(null);
   const [failed, setFailed] = React.useState(false);
   const mark = React.useRef<HTMLElement>(null);
   React.useEffect(() => {
@@ -452,9 +616,24 @@ function SourceViewer({ state, onClose }: { state: { sourceId: string; range?: [
           {failed ? <Alert tone="danger" title="Source indisponible" /> : !source ? (
             <div className="grid gap-2" aria-busy="true"><Skeleton className="h-4" /><Skeleton className="h-4 w-5/6" /><Skeleton className="h-4 w-4/6" /></div>
           ) : (
+            <>
+            {source.guide && (
+              <section aria-label="Guide de la source" className="mb-5 grid gap-3 rounded-lg border bg-surface-raised p-4">
+                <h3 className="text-sm font-medium text-text-muted">Guide de la source</h3>
+                <p className="text-sm leading-6">{source.guide.summary}</p>
+                {source.guide.topics.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {source.guide.topics.map((t) => (
+                      <Button key={t} size="sm" variant="secondary" title="Poser une question sur ce thème" onClick={() => onAsk(`Que disent mes sources sur « ${t} » ?`)}>{t}</Button>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
             <p className={cn("whitespace-pre-wrap font-serif text-reading")}>
               {state?.range ? <>{text.slice(0, a)}<mark ref={mark} className="rounded-xs bg-highlight px-0.5 text-on-highlight">{text.slice(a, b)}</mark>{text.slice(b)}</> : text}
             </p>
+            </>
           )}
         </div>
       </DialogContent>
@@ -535,6 +714,40 @@ function NoteEditor({ state, notebookId, canEdit, onClose, onSaved }: { state: {
             </div>
           </form>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ------------------------------------------------------ Renommer une source ---- */
+
+function RenameSourceDialog({ source, onClose, onRename }: { source: Source | null; onClose: () => void; onRename: (id: string, title: string) => Promise<string | null> }) {
+  const [title, setTitle] = React.useState("");
+  const [error, setError] = React.useState<string>();
+  const [saving, setSaving] = React.useState(false);
+  React.useEffect(() => { setTitle(source?.title ?? ""); setError(undefined); }, [source]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!source) return;
+    if (!title.trim()) { setError("Titre requis."); return; }
+    setSaving(true);
+    const err = await onRename(source.id, title);
+    setSaving(false);
+    if (err) { setError(err); return; }
+    toast({ title: "Source renommée", tone: "success" });
+    onClose();
+  }
+  return (
+    <Dialog open={Boolean(source)} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent size="sm" title="Renommer la source">
+        <form onSubmit={submit} className="grid gap-4" noValidate>
+          <Field id="source-title" label="Titre" error={error}><Input autoFocus value={title} maxLength={300} onChange={(e) => setTitle(e.target.value)} /></Field>
+          <div className="flex justify-end gap-2">
+            <DialogClose asChild><Button type="button" variant="secondary">Annuler</Button></DialogClose>
+            <Button type="submit" loading={saving}>Enregistrer</Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

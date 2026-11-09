@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/app/app-header";
-import { Badge } from "@/components/ui/feedback";
+import { Badge, Progress } from "@/components/ui/feedback";
 import { Card } from "@/components/ui/surfaces";
 import { createUserClient, getUser } from "@/lib/supabase/server";
 import { ProfileForm } from "../profile-form";
@@ -16,9 +16,17 @@ export default async function SettingsPage() {
   const [{ data: profile }, { data: workspaces }, { data: plans }] = await Promise.all([
     supabase.from("profiles").select("display_name, output_language, theme, web_notifications").eq("id", user.id).single(),
     supabase.from("workspaces").select("id, kind, name, plan_id").order("created_at"),
-    supabase.from("plans").select("id, name, price_cents, currency, billing_interval").order("price_cents"),
+    supabase.from("plans").select("id, name, price_cents, currency, billing_interval, limits").order("price_cents"),
   ]);
   const personal = workspaces?.find((w) => w.kind === "personal");
+  // Mêmes bornes que reserve_usage (date_trunc en UTC) ; crédits rendus exclus.
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+  const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
+  const { data: usage } = personal
+    ? await supabase.from("usage_ledger").select("feature, units, created_at").eq("workspace_id", personal.id).neq("status", "refunded").gte("created_at", monthStart)
+    : { data: null };
+  const limits = plans?.find((p) => p.id === personal?.plan_id)?.limits as { monthly_credits?: number; daily?: Record<string, number> } | undefined;
 
   return (
     <div className="min-h-dvh">
@@ -36,7 +44,37 @@ export default async function SettingsPage() {
           </div>
           {personal && plans ? <PlanCard workspaceId={personal.id} current={personal.plan_id} plans={plans} /> : <p role="alert" className="text-sm text-danger">Espace de travail introuvable.</p>}
         </Card>
+        {limits && usage && <UsageCard limits={limits} usage={usage} dayStart={dayStart} />}
       </main>
     </div>
+  );
+}
+
+const FEATURES: Record<string, string> = { chat: "Questions au chat", report: "Rapports", flashcards: "Fiches", quiz: "Quiz", mind_map: "Cartes mentales" };
+
+/** K01 : consommation du mois et du jour, lue sous RLS dans le registre d'usage. */
+function UsageCard({ limits, usage, dayStart }: { limits: { monthly_credits?: number; daily?: Record<string, number> }; usage: { feature: string; units: number; created_at: string }[]; dayStart: string }) {
+  const used = usage.reduce((n, u) => n + u.units, 0);
+  const today = (f: string) => usage.filter((u) => u.feature === f && u.created_at >= dayStart).length;
+  return (
+    <Card className="grid gap-4 p-5">
+      <h2 className="text-lg">Consommation</h2>
+      {limits.monthly_credits != null && (
+        <div className="grid gap-2">
+          <p className="flex justify-between text-sm"><span>Crédits du mois</span><span className="tabular-nums">{used} / {limits.monthly_credits}</span></p>
+          <Progress value={Math.min(100, Math.round((used / limits.monthly_credits) * 100))} label="Crédits du mois utilisés" />
+          <p className="text-xs text-text-subtle">Remis à zéro le 1er du mois (UTC). Une génération échouée ne consomme rien.</p>
+        </div>
+      )}
+      <table className="w-full text-sm">
+        <caption className="sr-only">Utilisation aujourd’hui</caption>
+        <thead><tr className="text-left text-text-muted"><th className="py-1 font-normal">Aujourd’hui</th><th className="py-1 text-right font-normal">Utilisé / limite</th></tr></thead>
+        <tbody>
+          {Object.entries(FEATURES).filter(([f]) => limits.daily?.[f] != null).map(([f, l]) => (
+            <tr key={f} className="border-t"><td className="py-1.5">{l}</td><td className="py-1.5 text-right tabular-nums">{today(f)} / {limits.daily![f]}</td></tr>
+          ))}
+        </tbody>
+      </table>
+    </Card>
   );
 }

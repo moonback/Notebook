@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bestQuote, formatPassages, resolveCitations, type Passage } from "./citations";
+import { bestQuote, formatPassages, resolveCitations, type Passage } from "./citations.ts";
 
 const source = "Introduction. Le protocole DMX pilote jusqu'à 512 canaux par univers. Art-Net transporte le DMX sur Ethernet.";
 const p = (n: number, start: number, end: number, id = `c${n}`): Passage => ({

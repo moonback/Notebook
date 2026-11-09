@@ -7,7 +7,7 @@ type Params = { params: Promise<{ id: string }> };
 
 async function sourceNotebook(id: string) {
   if (!/^[0-9a-f-]{36}$/i.test(id)) throw new ApiError(404, "not_found");
-  const { data } = await createServiceClient().from("sources").select("notebook_id, storage_path").eq("id", id).single();
+  const { data } = await createServiceClient().from("sources").select("notebook_id, workspace_id, storage_path").eq("id", id).single();
   if (!data) throw new ApiError(404, "not_found");
   return data;
 }
@@ -20,7 +20,7 @@ export const GET = handle(async (_req: NextRequest, { params }: Params) => {
   await requireRole(notebook_id, "viewer");
   const supabase = await createUserClient();
   const { data, error } = await supabase.from("sources")
-    .select("id, kind, title, status, error_code, origin_url, word_count, page_count, extracted_text, created_at").eq("id", id).single();
+    .select("id, kind, title, status, error_code, origin_url, word_count, page_count, extracted_text, guide, created_at").eq("id", id).single();
   if (error) throw error;
   return NextResponse.json({ source: data });
 });
@@ -43,11 +43,18 @@ export const PATCH = handle(async (req: NextRequest, { params }: Params) => {
 export const DELETE = handle(async (_req: NextRequest, { params }: Params) => {
   await requireUser();
   const { id } = await params;
-  const { notebook_id, storage_path } = await sourceNotebook(id);
+  const { notebook_id, workspace_id, storage_path } = await sourceNotebook(id);
   await requireRole(notebook_id, "editor");
   const db = createServiceClient();
   const { error } = await db.from("sources").delete().eq("id", id);
   if (error) throw error;
   if (storage_path) await db.storage.from("sources").remove([storage_path]);
+  // Le résumé du notebook ne doit plus citer la source supprimée : recalcul différé (même règle que le worker).
+  if (process.env.OPENROUTER_API_KEY && process.env.OPENROUTER_CHAT_MODEL) {
+    const runAfter = new Date(Date.now() + 20_000).toISOString();
+    const { data: q } = await db.from("jobs").select("id").eq("notebook_id", notebook_id).eq("kind", "notebook_overview").eq("status", "queued").limit(1);
+    if (q?.length) await db.from("jobs").update({ run_after: runAfter }).eq("id", q[0].id);
+    else await db.from("jobs").insert({ workspace_id, notebook_id, kind: "notebook_overview", target_id: notebook_id, priority: 150, run_after: runAfter });
+  }
   return new NextResponse(null, { status: 204 });
 });
