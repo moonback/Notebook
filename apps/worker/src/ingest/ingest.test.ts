@@ -1,6 +1,7 @@
 // Intégration : upload → job asynchrone → chunks indexés, et isolation stricte entre deux clients.
 import { readFileSync, existsSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { strToU8, zipSync } from "fflate";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { runOnce } from "../worker.ts";
 import { ingestHandler } from "./handler.ts";
@@ -58,6 +59,19 @@ describe.skipIf(!env.SUPABASE_ANON_KEY)("ingestion + isolation (intégration)", 
     expect(dl.data).toBeNull();
     const signed = await asB.storage.from("sources").createSignedUrl(path, 60);
     expect(signed.data).toBeNull();
+  });
+
+  it("traite un PPTX déposé dans Storage (page = n° de diapositive)", async () => {
+    const xml = (t: string) => strToU8(`<p:sld><a:p><a:r><a:t>${t}</a:t></a:r></a:p></p:sld>`);
+    const pptx = zipSync({ "ppt/slides/slide1.xml": xml("Introduction"), "ppt/slides/slide2.xml": xml("Le patch DMX associe chaque projecteur à une adresse.") });
+    const ws = (await admin.from("notebooks").select("workspace_id").eq("id", nb).single()).data!.workspace_id;
+    const p = `${ws}/${nb}/${crypto.randomUUID()}/original.pptx`;
+    expect((await admin.storage.from("sources").upload(p, new Blob([pptx], { type: "application/vnd.openxmlformats-officedocument.presentationml.presentation" }))).error).toBeNull();
+    const id = (await admin.rpc("add_source", { p_notebook: nb, p_user: users[0], p_kind: "pptx", p_title: "deck.pptx", p_storage_path: p })).data as string;
+    await runOnce(admin, "w-ingest", { ingest_source: ingestHandler(admin, null) });
+    expect((await admin.from("sources").select("status, page_count").eq("id", id).single()).data).toEqual({ status: "ready", page_count: 2 });
+    const hit = (await admin.from("chunks").select("page_start, content").eq("source_id", id).ilike("content", "%patch DMX%")).data!;
+    expect(hit[0].page_start).toBe(1); // un seul chunk couvre les 2 diapositives : il démarre page 1
   });
 
   it("indexe une note (kind note, texte dans note_body) et la rend cherchable", async () => {

@@ -3,6 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import { runOnce, type Handler, type JobKind } from "./worker.ts";
 import { embedderFromEnv } from "./ai/embeddings.ts";
 import { ingestHandler } from "./ingest/handler.ts";
+import { llmFromEnv } from "./ai/llm.ts";
+import { studioHandler } from "./studio/generate.ts";
 
 const url = process.env.SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -19,7 +21,9 @@ if (!embedder) console.warn("EMBEDDINGS_* non configuré : indexation en plein t
 // Un handler par type de job réellement implémenté ; les autres types ne sont pas réclamés.
 const handlers: Partial<Record<JobKind, Handler>> = {
   ingest_source: ingestHandler(db, embedder),
+  generate_artifact: studioHandler(db, llmFromEnv()),
 };
+if (!llmFromEnv()) console.warn("OPENROUTER_API_KEY / OPENROUTER_CHAT_MODEL absents : les générations du Studio échoueront (crédit rendu).");
 
 let stopping = false;
 process.on("SIGTERM", () => (stopping = true));

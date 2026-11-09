@@ -1,6 +1,6 @@
 "use client";
 import * as React from "react";
-import { AlertTriangle, ArrowUp, BookmarkPlus, FileText, Globe, Inbox, Lock, NotebookPen, Plus, Square, Sparkles, Trash2, Type, Upload } from "lucide-react";
+import { AlertTriangle, ArrowUp, BookmarkPlus, FileText, Globe, Inbox, Lock, NotebookPen, Pencil, Plus, Square, Sparkles, Trash2, Type, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { Alert, Badge, EmptyState, Progress, Skeleton } from "@/components/ui/feedback";
@@ -10,6 +10,7 @@ import { ListRow, Panel } from "@/components/ui/surfaces";
 import { Citation } from "@/components/ui/citation";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
+import { Studio } from "./studio";
 
 export type Role = "chat" | "viewer" | "editor" | "owner";
 type Source = { id: string; kind: string; title: string; status: string; error_code: string | null; word_count: number | null };
@@ -52,7 +53,9 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
   const [adding, setAdding] = React.useState(false);
   const [viewer, setViewer] = React.useState<{ sourceId: string; range?: [number, number] } | null>(null);
   const [noteEditor, setNoteEditor] = React.useState<{ id?: string } | null>(null);
+  const [renaming, setRenaming] = React.useState<Source | null>(null);
   const [mobileTab, setMobileTab] = React.useState("chat");
+  const [draft, setDraft] = React.useState<{ text: string } | null>(null); // question pré-remplie depuis le Studio
   const desktop = useMediaQuery("(min-width: 1024px)");
 
   const load = React.useCallback(async () => {
@@ -87,6 +90,14 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
     if (clean === title) return;
     const res = await fetch(`/api/v1/notebooks/${notebookId}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: clean }) });
     if (res.ok) setTitle(clean); else toast({ title: "Renommage impossible", tone: "error" });
+  }
+
+  async function renameSource(id: string, title: string): Promise<string | null> {
+    const res = await fetch(`/api/v1/sources/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ title }) });
+    if (res.status === 422) return (await res.json()).fields?.title ?? "Titre invalide.";
+    if (!res.ok) return "Renommage impossible. Réessayez.";
+    setSources((xs) => xs?.map((x) => (x.id === id ? { ...x, title: title.trim() } : x)) ?? null);
+    return null;
   }
 
   async function removeSource(s: Source) {
@@ -135,6 +146,7 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
                   <span className="flex items-center gap-1">
                     {s.status === "failed" && <Badge tone="danger">Échec</Badge>}
                     {busyStatus(s.status) && <Badge tone="accent">En cours</Badge>}
+                    {canEdit && s.kind !== "note" && <Button size="icon-sm" variant="ghost" aria-label={`Renommer ${s.title}`} className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100" onClick={() => setRenaming(s)}><Pencil aria-hidden /></Button>}
                     {canEdit && <Button size="icon-sm" variant="ghost" aria-label={`Supprimer ${s.title}`} className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100" onClick={() => removeSource(s)}><Trash2 aria-hidden /></Button>}
                     {s.status === "ready" && (
                       <Checkbox checked={!deselected.has(s.id)} aria-label={`Utiliser ${s.title} dans les réponses`}
@@ -152,14 +164,12 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
   );
 
   const titles = new Map((sources ?? []).map((s) => [s.id, s.title]));
-  const chatPanel = <Chat notebookId={notebookId} readyCount={selectedCount} sourceTitle={(id) => titles.get(id)} canSaveNote={canEdit} onNoteSaved={() => void load()} onOpenCitation={(c) => setViewer({ sourceId: c.source_id, range: [c.char_start, c.char_end] })} canViewSources={role !== "chat"} />;
+  const chatPanel = <Chat notebookId={notebookId} readyCount={selectedCount} sourceTitle={(id) => titles.get(id)} canSaveNote={canEdit} onNoteSaved={() => void load()} onOpenCitation={(c) => setViewer({ sourceId: c.source_id, range: [c.char_start, c.char_end] })} canViewSources={role !== "chat"} draft={draft} />;
 
   const studioPanel = (
-    <Panel id="studio" title="Studio" className="h-full">
-      <EmptyState icon={<Sparkles />} title="Bientôt disponible">
-        Résumés audio, cartes mentales, fiches et quiz générés à partir de vos sources arriveront dans une prochaine version.
-      </EmptyState>
-    </Panel>
+    <Studio notebookId={notebookId} canEdit={canEdit} sourceIds={ready.filter((s) => !deselected.has(s.id)).map((s) => s.id)} sourceTitle={(id) => titles.get(id)}
+      onOpenCitation={role !== "chat" ? (c) => setViewer({ sourceId: c.source_id, range: [c.char_start, c.char_end] }) : undefined}
+      onAsk={(text) => { setDraft({ text }); setMobileTab("chat"); }} />
   );
 
   return (
@@ -192,6 +202,7 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
 
       <AddSourcesDialog open={adding} onOpenChange={setAdding} notebookId={notebookId} onAdded={() => void load()} />
       <SourceViewer state={viewer} onClose={() => setViewer(null)} />
+      <RenameSourceDialog source={renaming} onClose={() => setRenaming(null)} onRename={renameSource} />
       <NoteEditor state={noteEditor} notebookId={notebookId} canEdit={canEdit} onClose={() => setNoteEditor(null)} onSaved={() => void load()} />
     </>
   );
@@ -199,7 +210,7 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
 
 /* ---------------------------------------------------------------- Chat ---- */
 
-function Chat({ notebookId, readyCount, onOpenCitation, canViewSources, sourceTitle, canSaveNote, onNoteSaved }: { notebookId: string; readyCount: number; onOpenCitation: (c: Cite) => void; canViewSources: boolean; sourceTitle: (id: string) => string | undefined; canSaveNote: boolean; onNoteSaved: () => void }) {
+function Chat({ notebookId, readyCount, onOpenCitation, canViewSources, sourceTitle, canSaveNote, onNoteSaved, draft }: { notebookId: string; readyCount: number; onOpenCitation: (c: Cite) => void; canViewSources: boolean; sourceTitle: (id: string) => string | undefined; canSaveNote: boolean; onNoteSaved: () => void; draft: { text: string } | null }) {
   const [saved, setSaved] = React.useState<Set<string>>(new Set());
   async function saveNote(id: string) {
     const res = await fetch(`/api/v1/messages/${id}/save-note`, { method: "POST" });
@@ -212,6 +223,7 @@ function Chat({ notebookId, readyCount, onOpenCitation, canViewSources, sourceTi
   const [conversationId, setConversationId] = React.useState<string | null>(null);
   const [messages, setMessages] = React.useState<Message[] | null>(null);
   const [text, setText] = React.useState("");
+  React.useEffect(() => { if (draft) setText(draft.text); }, [draft]);
   const [streaming, setStreaming] = React.useState(false);
   const [error, setError] = React.useState<{ title: string; body?: string } | null>(null);
   const abort = React.useRef<AbortController | null>(null);
@@ -535,6 +547,40 @@ function NoteEditor({ state, notebookId, canEdit, onClose, onSaved }: { state: {
             </div>
           </form>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ------------------------------------------------------ Renommer une source ---- */
+
+function RenameSourceDialog({ source, onClose, onRename }: { source: Source | null; onClose: () => void; onRename: (id: string, title: string) => Promise<string | null> }) {
+  const [title, setTitle] = React.useState("");
+  const [error, setError] = React.useState<string>();
+  const [saving, setSaving] = React.useState(false);
+  React.useEffect(() => { setTitle(source?.title ?? ""); setError(undefined); }, [source]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!source) return;
+    if (!title.trim()) { setError("Titre requis."); return; }
+    setSaving(true);
+    const err = await onRename(source.id, title);
+    setSaving(false);
+    if (err) { setError(err); return; }
+    toast({ title: "Source renommée", tone: "success" });
+    onClose();
+  }
+  return (
+    <Dialog open={Boolean(source)} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent size="sm" title="Renommer la source">
+        <form onSubmit={submit} className="grid gap-4" noValidate>
+          <Field id="source-title" label="Titre" error={error}><Input autoFocus value={title} maxLength={300} onChange={(e) => setTitle(e.target.value)} /></Field>
+          <div className="flex justify-end gap-2">
+            <DialogClose asChild><Button type="button" variant="secondary">Annuler</Button></DialogClose>
+            <Button type="submit" loading={saving}>Enregistrer</Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

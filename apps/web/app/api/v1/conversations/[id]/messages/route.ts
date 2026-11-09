@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { ApiError, handle, parseBody, requireRole, requireUser } from "@/lib/api";
 import { AiNotConfigured, AiUpstreamError, embedQuery, streamChat, type ChatMessage } from "@/lib/ai/openrouter";
-import { formatPassages, resolveCitations, type Passage } from "@/lib/rag/citations";
+import { formatPassages, resolveCitations, type Passage } from "@notebook/core/citations";
 import { log } from "@/lib/log";
 import { createServiceClient, createUserClient } from "@/lib/supabase/server";
 

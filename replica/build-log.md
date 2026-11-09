@@ -11,3 +11,5 @@
 | 2026-11-09 | S11 chat en flux + citations cliquables | fait (testé avec un faux OpenRouter) | Vraie clé OpenRouter ; Markdown riche | Effets React qui renvoyaient une valeur (`destroy is not a function`) |
 | 2026-11-09 | S28 réglages (préférences + offre simulée) | fait | Stripe réel | — |
 | 2026-11-09 | S24 notes (créer, modifier, verrou des citations, enregistrer une réponse) | fait | Éditeur riche (Tiptap prévu) : texte simple pour l instant ; export | Rechargement à chaud pendant le test (état UI perdu, serveur correct) |
+| 2026-11-09 | Import PPTX / EPUB + renommer une source | fait | — | Test anti « zip bomb » trop lent avec 160 Mo réels → plafond paramétrable |
+| 2026-11-09 | M3 Studio texte (rapports, fiches, quiz, cartes mentales) + K01 consommation | fait (testé avec un faux OpenRouter) | Notification navigateur ; suivi persistant fiches/quiz ; prompt visible après coup ; Stripe réel | `create_artifact` sans liste de sources prenait tout le notebook → le Studio envoie la sélection ; Vitest web sans alias `@` → `vitest.config.ts` |
