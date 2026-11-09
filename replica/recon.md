@@ -82,153 +82,279 @@ Disposition centrale documentée : **3 panneaux, Sources | Chat | Studio** (S08)
 
 ## 4. Fiches fonctionnelles
 
-Chaque fiche couvre : description, parcours, écrans, composants, actions, états (chargement, vide, erreur), validation, données, dépendances, priorité. L'état de reconnaissance est indiqué en tête. « ? » signale ce qui reste à confirmer sur captures.
+Chaque fiche suit la même grille de 12 attributs, plus l'état de reconnaissance.
 
-### 4.1 Tableau de bord et gestion des notebooks — DOC partiel + HYP — P0
-- **Description** : accueil listant les notebooks (possédés, partagés, publics visités) ; onglet « Featured » pour les comptes grand public.
-- **Parcours** : F01, F02, F21, F23. **Écrans** : S03, S04.
-- **Composants** : bouton Créer, cartes (emoji, titre), menu ⋮, onglets, badge de plan.
-- **Actions** : ouvrir, créer, retirer un notebook public de l'accueil (DOC) ; renommer et supprimer (HYP, Q09, Q10).
-- **États** : vide ? rempli ? limite de notebooks atteinte (100 / 200 / 500 selon le plan) ?
-- **Validation** : quota de notebooks par utilisateur.
-- **Données** : Notebook, NotebookMember, NotebookVisit.
-- **Dépendances** : auth.
+**Abréviations et marqueurs**
 
-### 4.2 Création, renommage, suppression, emoji — DOC + HYP — P0
-- **Création** : un clic, puis la pop-up d'ajout de sources s'ouvre (DOC 16206563).
-- **Emoji** : attribué automatiquement après les sources ; on le change via une recherche d'emoji dans le chat (DOC).
-- **Titre automatique, renommage, suppression** : non documentés (HYP). Deux articles de l'aide renvoient une 404 (Q01).
-- **Effet d'une suppression** : les sources sont supprimées et les liens publics cessent de fonctionner (DOC 17003757, 16322204).
-- **Validation à prévoir** : titre non vide ; confirmation explicite avant suppression.
+| abréviation | sens |
+| --- | --- |
+| OBS / DOC / HYP / INA | statut de reconnaissance (voir § 0) |
+| Fxx | parcours utilisateur (`user-flows.md`) |
+| Sxx | écran (`screens-inventory.md`) |
+| Qxx | question ouverte (`open-questions.md`) |
+| « non documenté » | absent de l'aide officielle |
+| ? | à confirmer sur captures |
 
-### 4.3 Partage — DOC — P1
-- **Privé** : invitation par email avec le rôle Lecteur (lecture des sources et des notes) ou Éditeur (ajouter ou retirer sources et notes, partager à son tour). Jusqu'à 50 personnes pour un compte perso ; pas de Google Groups (16206563).
-- **Public** : « Anyone with a link », signalé par une icône globe ; le visiteur doit être connecté. Désactivé pour Workspace/Edu (16322204).
-- **Chat view** : lien qui n'affiche que le chat. **Il ne retire pas l'accès réel** d'après la doc ; c'est une faiblesse à corriger dans le clone.
-- **Lien d'artefact** : consultable sans compte, invalide si l'artefact est supprimé.
-- **Copie** : « Allow copies » ; la copie reprend sources et Studio, sans chat ni notes (contradiction avec la FAQ, Q02).
-- **Analytics** : utilisateurs et requêtes par jour sur 7 jours, à partir de 4 utilisateurs.
-- **États** : cadenas (privé), personnes (partagé), globe (public) (16269187).
-- **Écrans** : S25, S26, S27, S32, S33. **Parcours** : F19 à F22.
+### 4.1 Tableau de bord et gestion des notebooks — DOC partiel + HYP — **P0**
+| attribut | contenu |
+| --- | --- |
+| Description | Accueil qui liste les notebooks possédés, partagés et publics visités ; onglet « Featured » pour les comptes grand public |
+| Parcours | F01, F02, F21, F23 |
+| Écrans | S03, S04 |
+| Composants | bouton Créer, cartes (emoji, titre), menu ⋮ par carte, onglets, badge de plan à côté de l'avatar |
+| Actions | ouvrir ; créer ; retirer un notebook public de l'accueil (DOC) ; renommer et supprimer depuis la carte (HYP, Q09, Q10) ; vue grille ou liste et tri (HYP, Q06) |
+| Chargement | non documenté (Q15) |
+| Vide | non documenté ; on suppose un CTA « Créer » (Q15) |
+| Erreur | plafond de notebooks atteint (100, 200 ou 500 selon le plan) : message non vu |
+| Validation | quota de notebooks par utilisateur |
+| Données | Notebook, NotebookMember, NotebookVisit |
+| Dépendances | authentification |
 
-### 4.4 Importation de sources et formats acceptés — DOC — P0
+### 4.2 Création, renommage, suppression, emoji — DOC + HYP — **P0**
+| attribut | contenu |
+| --- | --- |
+| Description | Créer un notebook en un clic (la pop-up d'ajout de sources s'ouvre) ; emoji auto modifiable ; renommer ; supprimer |
+| Parcours | F02, F23 |
+| Écrans | S03, S05, S08, S11 (sélecteur d'emoji) |
+| Composants | bouton Créer, titre éditable (HYP), sélecteur d'emoji avec recherche, dialogue de confirmation (HYP) |
+| Actions | créer (DOC 16206563) ; changer l'emoji (DOC) ; renommer et supprimer (HYP : deux articles en 404, Q01) |
+| Chargement | génération de l'emoji après les sources (DOC) ; titre auto (HYP, Q09) |
+| Vide | notebook sans source → pop-up d'ajout |
+| Erreur | non documenté |
+| Validation | titre non vide et longueur max (Q34) ; confirmation avant suppression (à imposer dans le clone) |
+| Données | Notebook.title, emoji ; la suppression retire les sources et casse les liens publics (DOC 17003757, 16322204) |
+| Dépendances | LLM (emoji, titre auto) |
+
+### 4.3 Partage — DOC — **P1**
+| attribut | contenu |
+| --- | --- |
+| Description | Partage privé (Lecteur ou Éditeur), lien public, « chat view », liens d'artefact, autorisation de copie, analytics |
+| Parcours | F19, F20, F21, F22 |
+| Écrans | S25, S26, S27, S32, S33 |
+| Composants | dialogue Share (champ email, rôle, accès Restricted ou Anyone with a link, Copy link, Copy link to chat view, case Allow copies, Save) ; icône cadenas, personnes ou globe ; bouton Copy ; onglet Analytics |
+| Actions | inviter, changer de rôle, passer en public ou en privé, copier un lien, autoriser les copies, copier le notebook |
+| Chargement | analytics mises à jour toutes les 24 h |
+| Vide | analytics indisponibles sous 4 utilisateurs ou sans activité sur 7 jours |
+| Erreur | email invalide (Q33) ; plus de 50 destinataires pour un compte perso ; Google Groups refusés ; public interdit en Workspace/Edu ; lien d'un artefact supprimé |
+| Validation | format email, plafond de destinataires, rôle obligatoire ; seuls owner et éditeurs gèrent l'accès public |
+| Données | NotebookMember, Notebook.access, allow_copies, Artifact.public_link_enabled, NotebookAnalyticsDaily |
+| Dépendances | envoi d'emails ; la « chat view » ne retire pas l'accès réel dans l'original (à corriger dans le clone, H03) |
+
+### 4.4 Importation de sources et formats acceptés — DOC — **P0**
+
+**Formats et contraintes**
+
 | catégorie | formats | particularités |
 | --- | --- | --- |
 | Fichiers | PDF, DOCX, TXT, MD, CSV, PPTX, EPUB | ≤ 200 Mo et ≤ 500 000 mots ; PDF protégé contre la copie refusé |
 | Images | avif, bmp, gif, heic/heif, ico, jp2, jpeg, png, tiff, webp | « certains types fonctionnent moins bien » |
 | Audio | ~22 extensions (mp3, wav, m4a, ogg, opus…) | transcrit à l'import ; ~70 langues ; refus si pas de parole |
-| Web | URL HTML (texte seul ; ni images, ni vidéos, ni pages imbriquées) ; PDF par URL | paywall refusé ; plusieurs URL à la fois |
-| YouTube | URL publique avec sous-titres | transcript seul ; vidéo de moins de 72 h parfois indisponible ; supprimée sous 30 j si la vidéo disparaît |
-| Google | Docs, Slides (≤ 100 slides), Sheets (≤ 100k tokens) | sync auto ; ni notes de bas de page ni commentaires ; plusieurs onglets réunis en une source |
-| Texte | copier-coller, titre modifiable | — |
+| Web | URL HTML : texte seul, sans images, vidéos ni pages imbriquées ; PDF par URL | paywall refusé ; plusieurs URL à la fois |
+| YouTube | URL publique avec sous-titres | transcript seul ; vidéo de moins de 72 h parfois indisponible ; source supprimée sous 30 j si la vidéo disparaît |
+| Google | Docs, Slides (≤ 100), Sheets (≤ 100k tokens) | sync auto ; sans notes de bas de page ni commentaires ; plusieurs onglets réunis en une source |
+| Texte | copier-coller | titre modifiable |
 | Autres | Play Books (skip), chats Gemini (skip) | — |
 
-- **Limites de sources par notebook** : 50 (gratuit), 100, 300, 500 ou 400 (Q03), 600.
-- **Erreurs documentées** : taille, nombre de mots, PDF protégé, lien YouTube invalide, vidéo jugée dangereuse, pas de sous-titres, langue non prise en charge, audio de mauvaise qualité.
-- **États** : importing / ready / failed / inactive. Les visuels de ces états n'ont pas été vus (Q13, Q14).
-- **Écrans** : S05, S06, S07. **Parcours** : F02 à F05.
+**Grille de la fiche**
 
-### 4.5 Extraction et traitement des documents — DOC + HYP — P0
-- Chaque source est convertie en texte (OCR / vision pour les images, STT pour l'audio, transcript pour YouTube). La visionneuse peut afficher un rendu différent de l'original (16215270).
-- Chaque source reçoit un **Source Guide**, résumé généré automatiquement (16215270).
-- Une source trop courte est citée en bloc, sans extrait (16215270, 16269187). Cela suggère un découpage en passages avec recherche des plus pertinents : *« récupère l'information la plus pertinente selon la question »* (FAQ). → **HYP : un pipeline RAG** (découpage, embeddings, recherche).
-- Le modèle utilisé est Gemini. Le clone dépendra d'un LLM tiers.
+| attribut | contenu |
+| --- | --- |
+| Description | Ajout de sources depuis un fichier, Drive, une URL, YouTube, un texte collé, ou par recherche (Fast et Deep Research) |
+| Parcours | F02, F03, F04, F05 |
+| Écrans | S05, S06, S07, S09 |
+| Composants | zone d'upload, sélecteur Drive, champ URL multi-lignes, champ texte avec titre, recherche avec bascules Web/Drive et Deep Research, résultats à cocher avec « View », Import, Cancel |
+| Actions | téléverser, coller, rechercher, cocher des résultats, importer, annuler |
+| Chargement | import (visuel non vu, Q13) ; Deep Research de plusieurs minutes, non bloquante ; Play Books jusqu'à 1 min |
+| Vide | aucun résultat de recherche (non documenté) |
+| Erreur | taille, nombre de mots, PDF protégé, paywall, YouTube (lien invalide, dangereux, sans sous-titres, langue non prise en charge), audio sans parole ou de mauvaise qualité, Drive sans droit ; import partiel au-delà du quota (libellés non vus, Q14) |
+| Validation | type de fichier, ≤ 200 Mo, ≤ 500k mots, nombre de sources (50 → 600 selon le plan), URL valide |
+| Données | Source, ResearchJob |
+| Dépendances | stockage objet, parseurs, OCR/vision, STT, transcripts YouTube, API Drive (OAuth), API de recherche web, agent Deep Research |
 
-### 4.6 Gestion et sélection des sources — DOC — P0
-- **Sélection** : cases à cocher dans le panneau Sources et sélecteur dans le champ de saisie. Les notes ne sont prises en compte que si elles sont cochées.
-- **Labels** : à partir de 5 sources, les labels sont automatiques par défaut ; on peut en créer, en renommer, en supprimer et y déplacer des sources.
-- **Source Drive inactive** : elle compte dans le quota mais n'est plus utilisée ; un lien permet de demander l'accès.
-- **Effet sur le Studio** : supprimer ou modifier une source **ne change pas** les artefacts déjà générés.
-- **Inconnu** : la sélection est-elle personnelle ou partagée avec les collaborateurs ? (Q07)
+### 4.5 Extraction et traitement des documents — DOC + HYP — **P0**
+| attribut | contenu |
+| --- | --- |
+| Description | Conversion de chaque source en texte exploitable, résumé automatique (Source Guide), découpage pour la recherche |
+| Parcours | F02, F03, F06 |
+| Écrans | S09 (statut), S10 (texte extrait et Source Guide) |
+| Composants | indicateur d'état sur la ligne de source, visionneuse, bloc Source Guide, bouton « Click to sync with Google Drive » |
+| Actions | resynchroniser une source Drive, ouvrir le Source Guide |
+| Chargement | extraction ou transcription (durée non documentée, Q13) ; resync Drive toutes les quelques minutes |
+| Vide | source trop courte → citée en bloc, sans extrait (DOC) |
+| Erreur | rendu différent de l'original (documenté) ; source Drive inactive si l'accès est perdu (compte dans le quota, n'est plus utilisée) |
+| Validation | 500k mots maximum |
+| Données | Source.extracted_text, source_guide_summary, Chunk (HYP) |
+| Dépendances | pipeline RAG (découpage, embeddings, base vectorielle : HYP) ; LLM |
 
-### 4.7 Chat IA contextualisé — DOC — P0
-- **Principe** : questions et instructions ; réponses tirées uniquement des sources. Si l'information est absente ou si la demande sort des sources (tâche créative), le chat refuse.
-- **Configuration (S12)** : style Default / Learning Guide / Custom (persona libre) et longueur de réponse. Les consignes personnalisées sont synchronisées avec Gemini Apps.
-- **Contrôles** : Stop / Keep generating ; étapes de réflexion dépliables ; cartes interactives (lancer une vidéo ou un deck depuis le chat).
-- **Fonctions agentiques expérimentales** : recherche web, exécution de code, fichiers générés (png, svg, pdf, docx, md, txt, jpg, gif, csv, json, xlsx, pptx).
-- **États** : vide (résumé et prompts suggérés), streaming, réponse, refus (filtre de sécurité ou info absente), quota proche ou atteint (message en pied de chat avec l'heure de réinitialisation).
-- **Données** : ChatMessage, Citation.
-- **Dépendances** : LLM, index vectoriel.
+### 4.6 Gestion et sélection des sources — DOC — **P0**
+| attribut | contenu |
+| --- | --- |
+| Description | Cocher les sources utilisées par le chat et le Studio ; labels thématiques automatiques à partir de 5 sources ; renommer et supprimer |
+| Parcours | F07, F03 |
+| Écrans | S09, S11 (sélecteur dans le champ de saisie) |
+| Composants | cases à cocher, « tout sélectionner » (HYP), groupes de labels, menu ⋮ par source, icône note |
+| Actions | cocher ou décocher ; créer, renommer, supprimer un label ; déplacer une source ; renommer et supprimer une source (HYP) |
+| Chargement | création des labels automatiques (non documenté) |
+| Vide | 0 source : invitation à ajouter |
+| Erreur | aucune source cochée (Q12) ; source inactive |
+| Validation | au moins 1 source cochée pour le chat (HYP) |
+| Données | Source.selected (par utilisateur ou partagé ? Q07), SourceLabel |
+| Dépendances | LLM pour les labels |
 
-### 4.8 Citations — DOC — P0
-- Citations inline numérotées. Survol : le texte cité s'affiche en entier. Clic : ouverture de la source au passage concerné.
-- Les citations peuvent porter sur du texte ou sur des images.
-- Les citations se retrouvent aussi dans les notes sauvegardées, les rapports et l'export Sheets (onglet 2).
-- **Validation à prévoir** : chaque citation doit pointer vers un passage existant de la source.
+### 4.7 Chat IA contextualisé — DOC — **P0**
+| attribut | contenu |
+| --- | --- |
+| Description | Questions et instructions avec réponses tirées **uniquement** des sources cochées ; résumé initial ; prompts suggérés ; personnalisation ; fonctions agentiques expérimentales (code, fichiers, recherche web) |
+| Parcours | F06, F07, F08 |
+| Écrans | S11, S12 |
+| Composants | champ de saisie avec sélecteur de sources, bulles, chips d'action (Mind Map, Audio), Stop / Keep generating, étapes de réflexion dépliables, cartes interactives, pied de quota, 👍/👎 |
+| Actions | envoyer, arrêter, reprendre, configurer (style Default / Learning Guide / Custom, longueur), donner un avis, signaler une réponse offensante |
+| Chargement | réponse en streaming (HYP sur le rendu) |
+| Vide | résumé de toutes les sources et prompts suggérés |
+| Erreur | « ne peut pas répondre » (information absente ou tâche créative) ; filtre de sécurité ; quota proche ou atteint avec heure de réinitialisation ; erreur réseau (Q32) |
+| Validation | message non vide ; quota de chat (50/jour en gratuit selon le tableau Workspace) |
+| Données | ChatMessage, Notebook.chat_style, custom_instructions |
+| Dépendances | LLM, index vectoriel, compteur d'usage ; sandbox d'exécution pour les fonctions agentiques |
 
-### 4.9 Historique des conversations — DOC + HYP — P0
-- L'historique est conservé et privé pour chaque utilisateur. On peut l'effacer via le menu ⋮ du chat → « Delete chat history ».
-- La copie d'un notebook ne reprend pas le chat.
-- **HYP** : un seul fil par notebook, pas de liste de conversations (Q08). C'est une opportunité de différenciation (C06).
+### 4.8 Citations — DOC — **P0**
+| attribut | contenu |
+| --- | --- |
+| Description | Citations numérotées dans le texte, chacune reliée au passage exact (texte ou image) ; présentes aussi dans les notes, les rapports et l'export Sheets |
+| Parcours | F06, F09, F16 |
+| Écrans | S11, S10, S19, S24 |
+| Composants | chip de citation, popover d'extrait au survol, surlignage dans la visionneuse |
+| Actions | survoler (voir l'extrait complet), cliquer (ouvrir la source au bon endroit) |
+| Chargement | ouverture de la visionneuse (non documenté) |
+| Vide | source courte → citation globale sans extrait |
+| Erreur | source supprimée après coup (comportement non documenté) |
+| Validation | chaque citation pointe vers un passage existant (à garantir dans le clone) |
+| Données | Citation → Chunk / Source |
+| Dépendances | découpage avec positions (page, offset, timestamp) |
 
-### 4.10 Notes — DOC — P0
-- **Création** : manuelle, à partir d'une réponse (« Save to note », format et citations conservés), ou par texte collé.
-- **Statut** : une note **est une source**. On peut la cocher, elle peut être citée et elle sert aux générations du Studio.
-- **Édition** : une note issue du chat n'est éditable qu'après retrait des citations.
-- **Export et historique** : export vers Google Docs (sans synchronisation retour). Les anciennes notes du Studio se convertissent en sources (une par une ou toutes d'un coup).
-- **Suppression** : définitive, sans récupération possible (FAQ). C'est une opportunité (D05).
-- **Mobile** : lecture seule.
+### 4.9 Historique des conversations — DOC + HYP — **P0**
+| attribut | contenu |
+| --- | --- |
+| Description | Historique conservé, privé pour chaque utilisateur, effaçable ; non copié lors de la copie d'un notebook |
+| Parcours | F06, F11 |
+| Écrans | S11 |
+| Composants | fil de messages, menu ⋮ → « Delete chat history » |
+| Actions | relire, effacer |
+| Chargement | rechargement de l'historique (non documenté) |
+| Vide | après effacement → vue initiale (HYP) |
+| Erreur | non documenté |
+| Validation | confirmation avant effacement (HYP) |
+| Données | ChatMessage (notebook_id, user_id) ; un seul fil par notebook (HYP, Q08) |
+| Dépendances | aucune |
 
-### 4.11 Studio — DOC — P1
-- **Tuiles** : Audio, Vidéo, Mind Map, Rapports, Data Table, Flashcards, Quiz, Slide Deck, Infographie.
-- **Paramétrage** : crayon pour personnaliser ; « View custom prompt » pour revoir le prompt utilisé.
-- **Génération** : en **arrière-plan**, plusieurs jobs en parallèle possibles. À la fin : notification navigateur, titre d'onglet animé, point bleu « non lu ».
-- **Quotas** : jauge de coût estimé ; « Generate later » quand le quota est épuisé.
-- **Droits** : générer ou supprimer demande le droit d'édition sur le notebook.
-- **Artefact automatique** : un artefact peut être offert à la première source, hors quota.
-- **Actions sur un artefact** : renommer, télécharger, partager, supprimer, feedback.
+### 4.10 Notes — DOC — **P0**
+| attribut | contenu |
+| --- | --- |
+| Description | Notes manuelles, réponses sauvegardées ou textes collés ; **une note est une source** (cochable, citable, utilisée par le Studio) |
+| Parcours | F09, F10 |
+| Écrans | S09, S24, S13 (anciennes notes à convertir) |
+| Composants | bouton Create note, éditeur (riche ? Q11), bouton Save to note, menu ⋮ (Export to Docs, Delete), bouton Convert / Convert all |
+| Actions | créer, éditer, sauvegarder une réponse, exporter, supprimer, convertir |
+| Chargement | export Docs dans un nouvel onglet |
+| Vide | aucune note (non documenté) |
+| Erreur | une note issue du chat n'est pas éditable tant que les citations y sont ; une note supprimée est irrécupérable |
+| Validation | non documenté (Q34) |
+| Données | Note = Source de type note ; has_citations ; origin |
+| Dépendances | API Docs pour l'export dans l'original (DOCX ou Markdown dans le clone) |
 
-### 4.12 Audio Overview — DOC (interactif INA) — P2
-- **Principe** : discussion entre hôtes IA.
-- **Formats** : Deep Dive (2 voix, par défaut), Brief (1 voix, moins de 2 min), Critique, Debate.
-- **Options** : langue (80+), longueur (courte / normale / longue, anglais seulement pour longue), prompt de focalisation.
-- **Lecteur** : vitesse, avance et retour, téléchargement, partage par lien, 👍/👎. On peut continuer à chatter pendant l'écoute.
-- **Mode interactif** : anglais seulement ; l'utilisateur « rejoint » la conversation à la voix et les hôtes lui répondent.
-- **États** : génération de quelques minutes, puis « Load » pour les anciens audios.
-- **Quota** : 3 par jour en gratuit (tableau Workspace).
-- **Dépendances** : LLM pour le script, TTS multi-voix, stockage.
+### 4.11 Studio (socle commun) — DOC — **P1**
+| attribut | contenu |
+| --- | --- |
+| Description | Panneau de génération de 9 types d'artefacts, en arrière-plan et en parallèle, avec personnalisation, quotas et notifications |
+| Parcours | F12 à F18, F25 |
+| Écrans | S13, S14, S17 |
+| Composants | tuiles par type, crayon (personnaliser), liste d'artefacts avec menu ⋮ (renommer, télécharger, partager, supprimer, View custom prompt), point bleu « non lu », jauge de coût IA, Generate now / Generate later, Upgrade |
+| Actions | générer, personnaliser, revoir le plan, renommer, supprimer, télécharger, partager, consulter le prompt, donner un avis |
+| Chargement | génération en arrière-plan de quelques minutes (plus de 30 min pour la vidéo) ; notification navigateur, titre d'onglet animé, point bleu |
+| Vide | Studio vide ; un artefact peut être offert à la création (hors quota) |
+| Erreur | quota atteint → Generate later (exécution différée de quelques heures) ou Upgrade ; pas de droit d'édition ; **échec de génération non documenté (Q31)** |
+| Validation | droit d'édition requis ; quota par type ; options obligatoires selon le type |
+| Données | Artifact (type, status, options, custom_prompt, source_ids_snapshot, unread_by), ArtifactOutline, UsageLedger |
+| Dépendances | file de jobs, stockage, Web Push, LLM ; fournisseurs média selon le type |
 
-### 4.13 Cartes mentales — DOC — P1
-- **Génération** : depuis une chip du chat ; le résultat est rangé comme note dans le Studio.
-- **Viewer** : zoom, défilement, déplier ou replier les branches. **Cliquer un nœud pose une question dans le chat.** Plein écran, téléchargement, feedback.
-- **Régénérer** = supprimer la note (pas de bouton dédié).
-- **Quota** : 10 par jour en gratuit.
+### 4.12 Audio Overview — DOC (mode interactif INA) — **P2**
+| attribut | contenu |
+| --- | --- |
+| Description | Discussion entre hôtes IA à partir des sources. Formats : Deep Dive (2 voix), Brief (1 voix, < 2 min), Critique, Debate |
+| Parcours | F12 |
+| Écrans | S13, S14, S15 |
+| Composants | dialogue (format, langue 80+, longueur courte / normale / longue, prompt), lecteur (lecture, avance et retour, vitesse, Share, Download, 👍/👎, Load, Interactive mode / Join) |
+| Actions | générer, écouter en continuant à chatter, changer la vitesse, télécharger, partager, rejoindre la conversation (anglais seulement) |
+| Chargement | quelques minutes ; « Load » pour les audios déjà générés |
+| Vide | aucun audio |
+| Erreur | quota (3/jour en gratuit) ; pas de droit d'édition ; artefacts glitchés ; échec (Q31) |
+| Validation | droit d'édition ; longueur « longue » réservée à l'anglais ; mode interactif réservé aux nouveaux audios |
+| Données | Artifact type=audio, file_ref MP3, options |
+| Dépendances | LLM (script), TTS multi-voix ; STT et TTS temps réel pour le mode interactif |
 
-### 4.14 Flashcards et quiz — DOC — P1
-- **Options** : difficulté facile / moyen / difficile, nombre (moins, standard, plus), prompt.
-- **Flashcards** : retourner, « Got it » / « Missed it », Explain, mélanger, supprimer une carte, recommencer, plein écran, export CSV. La progression est mémorisée. À la fin : bilan et nouvelle session avec les mêmes cartes, toutes les cartes, ou seulement les cartes ratées.
-- **Quiz** : Hint, Explain, navigation, score, Retake.
-- **Quota** : 10 par jour en gratuit.
+### 4.13 Cartes mentales — DOC — **P1**
+| attribut | contenu |
+| --- | --- |
+| Description | Arbre des thèmes et sous-thèmes des sources |
+| Parcours | F14 |
+| Écrans | S11 (chip), S13, S18 |
+| Composants | canvas zoomable, nœuds dépliables, boutons plein écran, téléchargement et fermeture, 👍/👎 |
+| Actions | zoomer, défiler, déplier ou replier, **cliquer un nœud pour poser une question dans le chat**, télécharger |
+| Chargement | génération (durée non documentée) |
+| Vide | aucune |
+| Erreur | quota (10/jour en gratuit) ; pour régénérer, il faut supprimer la note |
+| Validation | au moins 1 source |
+| Données | Artifact type=mind_map, MindMapNode |
+| Dépendances | LLM, bibliothèque de graphe |
 
-### 4.15 Rapports, présentations, infographies, tableaux — DOC (deck et infographie 18+ INA) — P1/P2
-- **Rapports « Document »** : modèles FAQ, Study guide, Briefing, suggestion IA ou personnalisé. Export vers Docs ; les tableaux du rapport partent vers Sheets.
-- **Rapports « Interactive »** (Learning Overview) : ils proposent d'autres artefacts à intégrer.
-- **Data Table** : colonnes définies par prompt ; export Sheets (données dans l'onglet 1, citations dans l'onglet 2).
-- **Slide Deck** :
-  - options : format, langue, longueur, sources, prompt ;
-  - revue du plan avant rendu (« Proceed » est irréversible) ;
-  - slideshow ;
-  - **révision par slide** (texte, mise en page, visuel ; supprimer, restaurer ou réordonner) : chaque révision produit un nouveau deck et consomme du quota, et les sources ne sont pas relues ;
-  - export PDF ou PPTX.
-- **Infographie** : langue, niveau de détail (concis, standard, détaillé), orientation (carré, portrait, paysage), style visuel, prompt. Export PNG.
-- **Video Overview** :
-  - formats : Explainer, Short (~60 s), Cinematic (18+, anglais) ;
-  - 8 styles visuels plus un style personnalisé ;
-  - revue des « producer notes » avant rendu ;
-  - génération parfois supérieure à 30 min.
+### 4.14 Flashcards et quiz — DOC — **P1**
+| attribut | contenu |
+| --- | --- |
+| Description | Supports de révision interactifs à partir des sources |
+| Parcours | F15 |
+| Écrans | S13, S14, S20, S21 |
+| Composants | dialogue (difficulté, nombre, prompt) ; carte recto/verso, Got it / Missed it, Explain, Shuffle, supprimer une carte, Restart, plein écran, export CSV ; QCM, Hint, Explain, navigation, score |
+| Actions | réviser, marquer, demander une explication, recommencer (mêmes cartes, toutes, ou seulement les ratées), Retake |
+| Chargement | génération en arrière-plan |
+| Vide | aucune |
+| Erreur | quota (10/jour en gratuit) ; pas de droit d'édition |
+| Validation | difficulté parmi 3 valeurs ; nombre parmi 3 valeurs |
+| Données | Artifact, FlashcardItem / QuizItem, StudyProgress (progression mémorisée) |
+| Dépendances | LLM |
 
-### 4.16 Paramètres et préférences — DOC — P0/P1
-- **Menu Settings** :
-  - langue de sortie (80+, par défaut celle du compte) ;
-  - thème clair, sombre ou appareil (par défaut : appareil) ;
-  - notifications web ;
-  - Usage ;
-  - Connected apps (activées globalement, désactivables par notebook) ;
-  - Send feedback (avec capture) ;
-  - Report notebook (choix du type d'abus).
-- **Menu profil** : bouton « Visible watermarking » (Pro et Ultra).
+### 4.15 Rapports, présentations, infographies, tableaux, vidéo — DOC (deck, infographie et vidéo cinematic INA 18+) — **P1 / P2**
+| attribut | contenu |
+| --- | --- |
+| Description | Rapports « Document » (FAQ, Study guide, Briefing, suggestion IA, personnalisé) et « Interactive » ; Data Table ; Slide Deck révisable ; Infographie ; Video Overview (Explainer, Short, Cinematic) |
+| Parcours | F13, F16, F17, F18 |
+| Écrans | S13, S14, S16, S17, S19, S22, S23 |
+| Composants | sélecteur de modèle, dialogue (format, langue, longueur, niveau de détail, orientation, style visuel, sources, prompt, revue du plan) ; viewer avec zoom, slideshow, mode Revise (instructions par slide, Pending Changes, supprimer, restaurer, réordonner) ; exports |
+| Actions | générer, revoir le plan (Proceed irréversible), réviser un deck (crée un nouveau deck), exporter (Docs, Sheets, PDF, PPTX, PNG, MP4), partager, signaler |
+| Chargement | quelques minutes ; plus de 30 min pour la vidéo |
+| Vide | aucune |
+| Erreur | quota (rapports 10/jour ; decks et infographies « limités ») ; réservé aux 18+ ; les sources ne sont pas relues pendant une révision ; échec (Q31) |
+| Validation | droit d'édition ; Cinematic en anglais seulement ; options parmi des listes fermées |
+| Données | Artifact, ArtifactOutline, SlideRevision, Citation (rapports et tables) |
+| Dépendances | LLM ; génération d'images et de vidéos ; export PPTX/PDF ; API Docs/Sheets dans l'original |
 
-### 4.17 Limites d'usage et premium — DOC (contradictions Q04, Q05) — P1
+### 4.16 Paramètres et préférences — DOC — **P0 / P1**
+| attribut | contenu |
+| --- | --- |
+| Description | Langue de sortie (80+), thème (clair, sombre, appareil), notifications web, Usage, apps connectées, feedback, signalement, watermark visible (Pro et plus) |
+| Parcours | F24, F26 |
+| Écrans | S28, S29, S30, S31 |
+| Composants | menu Settings, sélecteur de langue, bascule de thème, interrupteur de notifications, fiches d'apps, formulaire de feedback avec capture, formulaire d'abus |
+| Actions | modifier une préférence, autoriser les notifications du navigateur, connecter ou déconnecter une app, envoyer un avis ou un signalement |
+| Chargement | — |
+| Vide | aucune app connectée (Q18) |
+| Erreur | notifications refusées par le navigateur |
+| Validation | langue parmi la liste ; type d'abus obligatoire |
+| Données | User (output_language, theme, notifications, visible_watermark), ConnectedApp, NotebookAppToggle, AbuseReport |
+| Dépendances | Web Push ; OAuth des apps tierces |
+
+### 4.17 Limites d'usage et premium — DOC (contradictions Q04, Q05) — **P1**
+
+**Paliers documentés**
+
 | limite (palier gratuit → plus haut) | valeur |
 | --- | --- |
 | Notebooks par utilisateur | 100 → 200 → 500 |
@@ -238,15 +364,31 @@ Chaque fiche couvre : description, parcours, écrans, composants, actions, état
 | Rapports, flashcards, quiz, mind maps par jour | 10 → 20 → 100 → 200 → 1k |
 | Deep Research | 10 par mois → 3, 20, 30, 200 par jour |
 | Data tables, infographies, decks | « Limited » → « Highest » (non chiffré) |
-| Autres différences premium | partage avancé (payant), accès anticipé, retrait du watermark visible (Pro et plus, sauf IN/KR/VN) |
+| Différences premium | partage avancé (payant), accès anticipé, retrait du watermark visible (Pro et plus, sauf IN/KR/VN) |
 
-- **Second modèle de quota** (17670842) : limites « compute-based », rafraîchies toutes les 5 h jusqu'à un plafond hebdomadaire ; ×2 pour Plus, ×4 pour Pro, ×5 ou ×20 de Pro pour Ultra.
-- **Hors quota** : « Generate later », « Upgrade » depuis le chat et le Studio.
-- **Prix indicatifs (US, sources tierces, non vérifiés)** : Plus ~4,99 $/mois, Pro ~19,99 $/mois, Ultra ~99,99 $ ou 199,99 $/mois.
+Un second modèle est aussi documenté (17670842) : limites « compute-based », rafraîchies toutes les 5 h jusqu'à un plafond hebdomadaire, ×2 pour Plus, ×4 pour Pro, ×5 ou ×20 de Pro pour Ultra.
+
+Prix indicatifs aux États-Unis, issus de sources tierces et non vérifiés : Plus ~4,99 $/mois, Pro ~19,99 $/mois, Ultra ~99,99 $ ou 199,99 $/mois.
+
+**Grille de la fiche**
+
+| attribut | contenu |
+| --- | --- |
+| Description | Quotas par plan, écran d'usage, génération différée, montée en gamme |
+| Parcours | F25 |
+| Écrans | S29, S34, S11 (pied de quota), S13 (jauge de coût) |
+| Composants | jauge d'usage, bannières « presque atteint » et « atteint, réinitialisation à HH:MM », jauge de coût estimé, Generate later, Upgrade, badge de plan |
+| Actions | consulter l'usage, différer une génération, passer au plan supérieur |
+| Chargement | — |
+| Vide | — |
+| Erreur | limite atteinte (bloquant jusqu'à la réinitialisation) |
+| Validation | contrôle côté serveur de chaque action par rapport au quota |
+| Données | UsageLedger, User.plan |
+| Dépendances | paiement (Stripe pour le clone), compteur d'usage |
 
 ## 5. Modèle de données
 
-Voir [data-model-observations.md](data-model-observations.md) : 20 entités et 12 règles métier documentées.
+Voir [data-model-observations.md](data-model-observations.md) : 21 entités et 12 règles métier documentées.
 Point clé : **une note est une source**, et un artefact garde un **instantané** des sources utilisées.
 
 ## 6. Matrice des fonctionnalités
@@ -336,6 +478,7 @@ Pistes pour un produit vendable :
 
 **Non fait** :
 - aucune interface authentifiée vue ;
+- inventaire de l'aide **non exhaustif** : 28 articles repérés via les liens de l'accueil de l'aide et d'un seul article, sans parcours du sitemap (choix délibéré : pas de crawl). « Toutes les pages publiques » n'est donc pas garanti ;
 - pas de changelog officiel, ni de fiches stores, ni de vidéos ;
 - pas d'avis utilisateurs (→ `/replica-entrepreneur`) ;
 - page de prix officielle illisible (SPA).

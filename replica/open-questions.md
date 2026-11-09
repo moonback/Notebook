@@ -31,6 +31,10 @@ Date : 2026-11-09. Chaque question renvoie à un écran (Sxx), un parcours (Fxx)
 | Q18 | Liste réelle des « Connected apps » proposées. | Settings → Connected apps | S30 |
 | Q19 | Contenu de l'écran Usage : jauge, pourcentage, heure de réinitialisation ? | Settings → Usage | S29 |
 | Q20 | Les fonctions « agentiques » du chat (exécution de code, génération de xlsx/pptx) sont-elles visibles pour tous ? | demander un graphique dans le chat | S11 |
+| Q31 | À quoi ressemble un artefact dont la génération échoue ? Peut-on relancer ? Le quota est-il rendu ? (non documenté) | provoquer un échec (sources très courtes, par exemple) | S13 |
+| Q32 | Quelle erreur s'affiche dans le chat en cas de coupure réseau ou de timeout ? | couper le réseau pendant une réponse | S11 |
+| Q33 | Que se passe-t-il avec un email de partage invalide ou sans compte Google ? Au-delà de 50 destinataires ? | saisir un email invalide | S25 |
+| Q34 | Validation du titre d'un notebook ou d'une note : longueur maximale, titre vide accepté ? | coller un titre très long | S08, S24 |
 
 ## C. Fonctions inaccessibles pour nous
 
@@ -79,3 +83,6 @@ Ces captures servent uniquement de référence et ne seront jamais intégrées a
 - [ ] **S08** clic sur le titre (renommer ?) → Q09
 - [ ] **S28** menu Settings ; **S29** Usage ; **S30** Connected apps → Q18, Q19
 - [ ] Tout message de limite atteinte, si vous en rencontrez un
+- [ ] **S13** artefact en échec, si cela arrive → Q31
+- [ ] **S11** erreur réseau pendant une réponse → Q32
+- [ ] **S25** email de partage invalide → Q33
