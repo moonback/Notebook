@@ -46,8 +46,8 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         aria-busy={loading || undefined}
         {...props}
       >
-        {loading && <Loader2 className="animate-spin" aria-hidden />}
-        {children}
+        {/* Slot (asChild) exige un enfant unique : pas d'icône de chargement dans ce cas */}
+        {asChild ? children : <>{loading && <Loader2 className="animate-spin" aria-hidden />}{children}</>}
       </Comp>
     );
   },

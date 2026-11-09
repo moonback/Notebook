@@ -73,7 +73,7 @@ export function Tr({ className, ...props }: React.HTMLAttributes<HTMLTableRowEle
 /** Ligne de liste générique (source, artefact) : icône · texte principal + méta · action. */
 export function ListRow({
   icon, title, meta, trailing, selected, className, ...props
-}: React.HTMLAttributes<HTMLDivElement> & { icon?: React.ReactNode; title: React.ReactNode; meta?: React.ReactNode; trailing?: React.ReactNode; selected?: boolean }) {
+}: Omit<React.HTMLAttributes<HTMLDivElement>, "title"> & { icon?: React.ReactNode; title: React.ReactNode; meta?: React.ReactNode; trailing?: React.ReactNode; selected?: boolean }) {
   return (
     <div
       className={cn("group flex min-h-11 items-center gap-3 rounded-md px-3 py-1.5 hover:bg-surface", selected && "bg-accent-soft/60", className)}

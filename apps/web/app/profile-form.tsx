@@ -18,7 +18,7 @@ export function ProfileForm({ initial }: { initial: Profile }) {
   const [values, setValues] = React.useState(initial);
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [saving, setSaving] = React.useState(false);
-  React.useEffect(() => applyTheme(initial.theme), [initial.theme]);
+  React.useEffect(() => { applyTheme(initial.theme); }, [initial.theme]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
