@@ -35,6 +35,8 @@ export const notebookCreateSchema = z.object({ title: z.string().trim().max(200,
 export const UPLOAD_TYPES = {
   pdf: ["application/pdf", "pdf"], txt: ["text/plain", "txt"], md: ["text/markdown", "md"], csv: ["text/csv", "csv"],
   docx: ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx"],
+  pptx: ["application/vnd.openxmlformats-officedocument.presentationml.presentation", "pptx"],
+  epub: ["application/epub+zip", "epub"],
 } as const;
 export const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
 

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { ApiError, handle, requireRole, requireUser } from "@/lib/api";
+import { z } from "zod";
+import { ApiError, handle, parseBody, requireRole, requireUser } from "@/lib/api";
 import { createServiceClient, createUserClient } from "@/lib/supabase/server";
 
 type Params = { params: Promise<{ id: string }> };
@@ -20,6 +21,20 @@ export const GET = handle(async (_req: NextRequest, { params }: Params) => {
   const supabase = await createUserClient();
   const { data, error } = await supabase.from("sources")
     .select("id, kind, title, status, error_code, origin_url, word_count, page_count, extracted_text, created_at").eq("id", id).single();
+  if (error) throw error;
+  return NextResponse.json({ source: data });
+});
+
+const renameSchema = z.object({ title: z.string().trim().min(1, "Titre requis.").max(300, "300 caractères maximum.") }).strict();
+
+/** Renommer une source (éditeur). */
+export const PATCH = handle(async (req: NextRequest, { params }: Params) => {
+  await requireUser();
+  const { id } = await params;
+  const { notebook_id } = await sourceNotebook(id);
+  await requireRole(notebook_id, "editor");
+  const { title } = await parseBody(req, renameSchema);
+  const { data, error } = await createServiceClient().from("sources").update({ title }).eq("id", id).select("id, title").single();
   if (error) throw error;
   return NextResponse.json({ source: data });
 });

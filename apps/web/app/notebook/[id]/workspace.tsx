@@ -29,6 +29,7 @@ const ERRORS: Record<string, string> = {
   file_missing: "Fichier introuvable : réimportez-le.",
   temporary_error: "Erreur temporaire : nouvelle tentative en cours.",
   lease_expired: "Le traitement a été interrompu. Supprimez puis réimportez la source.",
+  archive_too_large: "Fichier compressé trop volumineux une fois décompressé.",
 };
 const KIND_ICON: Record<string, React.ReactNode> = { web: <Globe />, text: <Type />, note: <NotebookPen /> };
 const busyStatus = (s: string) => s === "pending" || s === "processing";
@@ -370,7 +371,7 @@ function AddSourcesDialog({ open, onOpenChange, notebookId, onAdded }: { open: b
         for (const f of files) {
           const r = await fetch(`/api/v1/notebooks/${notebookId}/uploads`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ filename: f.name, size: f.size }) });
           const j = await r.json().catch(() => ({}));
-          if (r.status === 415) throw new Error(`« ${f.name} » : format non pris en charge (PDF, DOCX, TXT, MD, CSV).`);
+          if (r.status === 415) throw new Error(`« ${f.name} » : format non pris en charge (PDF, DOCX, PPTX, EPUB, TXT, MD, CSV).`);
           if (r.status === 422) throw new Error(`« ${f.name} » : fichier trop volumineux (200 Mo maximum).`);
           if (!r.ok) throw new Error("Préparation de l’envoi impossible.");
           const up = await fetch(j.uploadUrl, { method: "PUT", headers: { "content-type": j.contentType }, body: f });
@@ -404,8 +405,8 @@ function AddSourcesDialog({ open, onOpenChange, notebookId, onAdded }: { open: b
               <TabsTrigger value="text"><Type className="mr-1.5 inline size-3.5" aria-hidden />Texte</TabsTrigger>
             </TabsList>
             <TabsContent value="file" className="pt-4">
-              <Field id="files" label="Fichiers" hint="PDF, DOCX, TXT, MD ou CSV — 200 Mo maximum par fichier.">
-                <input ref={fileRef} type="file" multiple accept=".pdf,.docx,.txt,.md,.csv" className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-accent-soft file:px-3 file:py-2 file:text-sm file:font-medium file:text-on-accent-soft" />
+              <Field id="files" label="Fichiers" hint="PDF, DOCX, PPTX, EPUB, TXT, MD ou CSV — 200 Mo maximum par fichier.">
+                <input ref={fileRef} type="file" multiple accept=".pdf,.docx,.pptx,.epub,.txt,.md,.csv" className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-accent-soft file:px-3 file:py-2 file:text-sm file:font-medium file:text-on-accent-soft" />
               </Field>
             </TabsContent>
             <TabsContent value="url" className="pt-4">

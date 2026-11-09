@@ -4,6 +4,7 @@ import { Readability } from "@mozilla/readability";
 import { parseHTML } from "linkedom";
 import { PermanentError } from "../worker.ts";
 import { FetchRefused, safeFetch } from "./ssrf.ts";
+import { fromEpub, fromPptx, readZip } from "./office.ts";
 
 export type Extracted = { text: string; pageStarts: number[]; pageCount: number | null; title?: string };
 
@@ -47,7 +48,16 @@ export async function extract(kind: string, data: { file?: Uint8Array; url?: str
       return finalize({ text: new TextDecoder("utf-8").decode(data.file), pageStarts: [], pageCount: null });
     case "pdf":
       return finalize(await fromPdf(data.file!));
+    case "pptx": {
+      const r = fromPptx(data.file!);
+      return finalize({ text: r.text, pageStarts: r.pageStarts, pageCount: r.pageCount });
+    }
+    case "epub": {
+      const r = fromEpub(data.file!);
+      return finalize({ text: r.text, pageStarts: [], pageCount: null, title: r.title });
+    }
     case "docx": {
+      readZip(data.file!, () => false); // plafonds anti « zip bomb » avant de confier l'archive à mammoth
       try {
         const { value } = await mammoth.extractRawText({ buffer: Buffer.from(data.file!) });
         return finalize({ text: value, pageStarts: [], pageCount: null });
