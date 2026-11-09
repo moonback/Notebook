@@ -1,0 +1,48 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Contrastes (WCAG AA, clair et sombre)
+        run: |
+          python3 .claude/skills/replica-design/contrast.py replica/design/tokens.json
+          python3 .claude/skills/replica-design/contrast.py replica/design/tokens.dark.json
+
+      - run: pnpm -r typecheck
+      - run: pnpm -r lint --if-present
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Base locale (migrations + seed)
+        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
+      - name: Tests pgTAP (RLS, RPC)
+        run: supabase test db
+      - name: Variables locales (clés de démo générées par la CLI)
+        run: |
+          eval "$(supabase status -o env)"
+          printf 'SUPABASE_URL=%s\nSUPABASE_SERVICE_ROLE_KEY=%s\n' "$API_URL" "$SERVICE_ROLE_KEY" > apps/worker/.env
+      - run: pnpm -r test
+
+      - name: Build web
+        run: pnpm --dir apps/web build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:58321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: build-only
+          SUPABASE_SERVICE_ROLE_KEY: build-only

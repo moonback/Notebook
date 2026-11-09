@@ -28,7 +28,10 @@ Date : 2026-11-09.
 
 ---
 
-## M0 : Fondations (1 semaine)
+## M0 : Fondations (1 semaine) — ✅ fait le 2026-11-09 (sauf déploiements cloud)
+
+> **Réalisé** : monorepo pnpm, Supabase local (ports 583xx), migration `20261109000000_init.sql`, 24 tests pgTAP, auth email + lien magique, `/api/v1/me`, worker (claim/heartbeat/échec/remboursement, 3 tests d'intégration), workflow CI (écrit, non vérifié sur GitHub à la demande de l'utilisateur).
+> **Reste** : projet Supabase cloud UE, Vercel, Fly, Sentry (comptes requis), Google OAuth (client Google requis), suivi Realtime de la progression côté UI (aucun job réel avant M1).
 
 | | |
 | --- | --- |
