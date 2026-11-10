@@ -12,11 +12,13 @@ export const GET = handle(async (_req: NextRequest, { params }: Params) => {
   const { id } = await params;
   const role = await requireRole(id, "chat");
   const supabase = await createUserClient();
-  const [{ data }, { count: pending }] = await Promise.all([
+  const [{ data }, { count: pending }, { count: readySources }] = await Promise.all([
     supabase.from("notebooks").select("id, title, emoji, created_at, last_activity_at, chat_style, chat_custom_prompt, response_length, overview, suggested_questions").eq("id", id).single(),
     createServiceClient().from("jobs").select("id", { count: "exact", head: true }).eq("notebook_id", id).eq("kind", "notebook_overview").in("status", ["queued", "running"]),
+    // un compte, pas une liste : le rôle « chat » sait si le chat est utilisable sans voir les sources
+    createServiceClient().from("sources").select("id", { count: "exact", head: true }).eq("notebook_id", id).eq("status", "ready"),
   ]);
-  return NextResponse.json({ notebook: data, role, overviewPending: Boolean(pending) });
+  return NextResponse.json({ notebook: data, role, overviewPending: Boolean(pending), readySources: readySources ?? 0 });
 });
 
 const patchSchema = z.object({
