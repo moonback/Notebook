@@ -8,6 +8,8 @@ import { Dialog, DialogContent } from "@/components/ui/overlay";
 import { ListRow } from "@/components/ui/surfaces";
 import { toast } from "@/components/ui/toast";
 
+type Link = { id: string; scope: "full" | "chat_only"; created_at: string };
+const SCOPES = { full: "Lecture et chat", chat_only: "Chat seul (sources masquées)" } as const;
 type Person = { member_id: string | null; user_id: string | null; email: string; display_name: string | null; role: "owner" | "editor" | "viewer"; pending: boolean };
 const ROLES = [["viewer", "Lecteur"], ["editor", "Éditeur"]] as const;
 const select = "h-9 rounded-md border border-border-input bg-surface-raised px-2 text-sm";
@@ -27,13 +29,27 @@ export function ShareButton({ notebookId }: { notebookId: string }) {
   const [error, setError] = React.useState<string>();
   const [sending, setSending] = React.useState(false);
 
+  const [links, setLinks] = React.useState<Link[]>([]);
+  const [created, setCreated] = React.useState<string | null>(null); // URL affichée une seule fois
   const load = React.useCallback(async () => {
     try {
-      const r = await fetch(`/api/v1/notebooks/${notebookId}/members`);
-      if (!r.ok) throw new Error();
-      setPeople((await r.json()).people); setFailed(false);
+      const [r, l] = await Promise.all([fetch(`/api/v1/notebooks/${notebookId}/members`), fetch(`/api/v1/notebooks/${notebookId}/links`)]);
+      if (!r.ok || !l.ok) throw new Error();
+      setPeople((await r.json()).people); setLinks((await l.json()).links); setFailed(false);
     } catch { setFailed(true); }
   }, [notebookId]);
+  async function createLink(scope: Link["scope"]) {
+    const r = await fetch(`/api/v1/notebooks/${notebookId}/links`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scope }) }).catch(() => null);
+    if (!r?.ok) { toast({ title: "Lien non créé", tone: "error" }); return; }
+    const { link } = await r.json();
+    setCreated(link.url); setLinks((xs) => [link, ...xs]);
+    await navigator.clipboard?.writeText(link.url).then(() => toast({ title: "Lien copié", tone: "success" }), () => undefined);
+  }
+  async function revoke(l: Link) {
+    if (!confirm("Révoquer ce lien ? Les personnes qui l’ont ouvert perdent aussitôt l’accès.")) return;
+    const r = await fetch(`/api/v1/share-links/${l.id}`, { method: "DELETE" });
+    if (r.ok) { setLinks((xs) => xs.filter((x) => x.id !== l.id)); setCreated(null); } else toast({ title: "Révocation impossible", tone: "error" });
+  }
   React.useEffect(() => { if (open) void load(); }, [open, load]);
 
   async function invite(e: React.FormEvent) {
@@ -97,6 +113,29 @@ export function ShareButton({ notebookId }: { notebookId: string }) {
                 ))}
               </ul>
             )}
+          <h3 className="mb-1 mt-5 text-sm font-medium text-text-muted">Lien de partage</h3>
+          <p className="mb-2 text-xs text-text-subtle">Toute personne connectée qui ouvre le lien obtient l’accès choisi. « Chat seul » permet de poser des questions sans voir les sources.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="secondary" onClick={() => void createLink("full")}>Créer un lien « {SCOPES.full} »</Button>
+            <Button size="sm" variant="secondary" onClick={() => void createLink("chat_only")}>Créer un lien « Chat seul »</Button>
+          </div>
+          {created && (
+            <div className="mt-3 grid gap-1">
+              <Field id="share-link" label="Nouveau lien (affiché une seule fois)">
+                <Input readOnly value={created} onFocus={(e) => e.currentTarget.select()} />
+              </Field>
+            </div>
+          )}
+          {links.length > 0 && (
+            <ul className="mt-3 grid gap-0.5">
+              {links.map((l) => (
+                <li key={l.id}>
+                  <ListRow title={SCOPES[l.scope]} meta={`Créé le ${new Date(l.created_at).toLocaleDateString("fr-FR")}`}
+                    trailing={<Button size="sm" variant="ghost" onClick={() => void revoke(l)}>Révoquer</Button>} />
+                </li>
+              ))}
+            </ul>
+          )}
         </DialogContent>
       </Dialog>
     </>

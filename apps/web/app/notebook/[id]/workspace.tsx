@@ -16,7 +16,7 @@ import { ShareButton } from "./share-dialog";
 export type Role = "chat" | "viewer" | "editor" | "owner";
 type Source = { id: string; kind: string; title: string; status: string; error_code: string | null; word_count: number | null };
 type Cite = { marker: number; source_id: string; quote_text: string; char_start: number; char_end: number; verified: boolean };
-type Overview = { text: string | null; questions: string[]; pending: boolean };
+type Overview = { text: string | null; questions: string[]; pending: boolean; readySources: number };
 type Message = { id: string; role: "user" | "assistant"; content: string; status: string; citations?: Cite[]; feedback?: number | null };
 
 const ERRORS: Record<string, string> = {
@@ -65,7 +65,7 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
       const r = await fetch(`/api/v1/notebooks/${notebookId}`);
       if (!r.ok) return;
       const j = await r.json();
-      setOverview({ text: j.notebook.overview, questions: j.notebook.suggested_questions ?? [], pending: j.overviewPending });
+      setOverview({ text: j.notebook.overview, questions: j.notebook.suggested_questions ?? [], pending: j.overviewPending, readySources: j.readySources ?? 0 });
     } catch { /* le résumé est facultatif : le chat reste utilisable */ }
   }, [notebookId]);
   React.useEffect(() => { void loadOverview(); }, [loadOverview]);
@@ -188,7 +188,7 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
   );
 
   const titles = new Map((sources ?? []).map((s) => [s.id, s.title]));
-  const chatPanel = <Chat notebookId={notebookId} readyCount={selectedCount} sourceTitle={(id) => titles.get(id)} canSaveNote={canEdit} onNoteSaved={() => void load()} onOpenCitation={(c) => setViewer({ sourceId: c.source_id, range: [c.char_start, c.char_end] })} canViewSources={role !== "chat"} draft={draft} canConfigure={canEdit} overview={overview} />;
+  const chatPanel = <Chat notebookId={notebookId} readyCount={role === "chat" ? (overview?.readySources ?? 0) : selectedCount} sourceTitle={(id) => titles.get(id)} canSaveNote={canEdit} onNoteSaved={() => void load()} onOpenCitation={(c) => setViewer({ sourceId: c.source_id, range: [c.char_start, c.char_end] })} canViewSources={role !== "chat"} draft={draft} canConfigure={canEdit} overview={overview} />;
 
   const studioPanel = (
     <Studio notebookId={notebookId} canEdit={canEdit} sourceIds={ready.filter((s) => !deselected.has(s.id)).map((s) => s.id)} sourceTitle={(id) => titles.get(id)}
@@ -208,7 +208,8 @@ export function Workspace({ notebookId, initialTitle, role }: { notebookId: stri
       </div>
 
       {/* ≥ lg : 3 panneaux ; < lg : un onglet à la fois. Une SEULE disposition montée (un seul chat). */}
-      {desktop ? (
+      {/* Lien « chat seul » : ni sources ni Studio, le serveur refuse de toute façon leur lecture. */}
+      {role === "chat" ? <div className="min-h-0 flex-1 p-2 sm:p-3">{chatPanel}</div> : desktop ? (
       <div className="grid min-h-0 flex-1 grid-cols-[var(--panel-sources-w)_1fr] gap-3 p-3 xl:grid-cols-[var(--panel-sources-w)_1fr_var(--panel-studio-w)]">
         {sourcesPanel}{chatPanel}<div className="hidden xl:block">{studioPanel}</div>
       </div>
